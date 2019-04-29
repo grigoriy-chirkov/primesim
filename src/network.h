@@ -42,8 +42,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 class Link;
 
-
-
 enum Direction 
 {
     EAST = 0,
@@ -54,12 +52,19 @@ enum Direction
     DOWN = 5
 };
 
+
+
+
+// Modify: define new NetworkTypes
 enum NetworkType
 {
     MESH_2D = 0,
     MESH_3D = 1
 };
 
+
+
+// Modify: restructure for generality
 typedef struct Coord
 {
     int x;

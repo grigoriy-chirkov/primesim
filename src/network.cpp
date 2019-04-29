@@ -48,17 +48,28 @@ bool Network::init(int num_nodes_in, XmlNetwork* xml_net)
     int i, j, k;
     num_nodes = num_nodes_in;
     net_type = xml_net->net_type;
+
+
+
+    // Modify: define new net_width
     if (net_type == MESH_3D) {
         net_width = (int)ceil(cbrt(num_nodes));
     }
     else {
         net_width = (int)ceil(sqrt(num_nodes));
     }
+
+
+
     header_flits = xml_net->header_flits;
     data_width = xml_net->data_width;
     router_delay = xml_net->router_delay;
     link_delay = xml_net->link_delay;
     inject_delay = xml_net->inject_delay;
+
+
+
+    // Modify: define new data structure for storing links
     if (net_type == MESH_3D) {
         link = new Link** [net_width-1];
         for (i = 0; i < net_width-1; i++) {
@@ -82,6 +93,9 @@ bool Network::init(int num_nodes_in, XmlNetwork* xml_net)
         }
 
     }
+
+
+
     num_access = 0;
     total_delay = 0;
     total_router_delay = 0;
@@ -113,6 +127,9 @@ uint64_t Network::transmit(int sender, int receiver, int data_len, uint64_t time
     //Injection delay
     local_timer += inject_delay;
     
+
+
+    // Modify: need to change based on the Coord struct
     direction = loc_receiver.x > loc_cur.x ? EAST : WEST;
     local_distance += abs(loc_receiver.x - loc_cur.x);
     while (loc_receiver.x != loc_cur.x) {
@@ -143,6 +160,9 @@ uint64_t Network::transmit(int sender, int receiver, int data_len, uint64_t time
         loc_cur.z = (direction == UP) ? (loc_cur.z + 1) : (loc_cur.z - 1);
     }
 
+
+
+
     local_timer += router_delay;
     //Pipe delay 
     local_timer += packet_len - 1; 
@@ -160,6 +180,8 @@ uint64_t Network::transmit(int sender, int receiver, int data_len, uint64_t time
 }
 
 
+
+// Modify: Change for more networks; based on Coord struct
 Coord Network::getLoc(int node_id)
 {
     Coord loc;
@@ -176,6 +198,9 @@ Coord Network::getLoc(int node_id)
     return loc;
 }
 
+
+
+// Modify: Change for more networks; based on Coord struct
 int Network::getNodeId(Coord loc)
 {
     int node_id;
@@ -209,6 +234,9 @@ int Network::getHeaderFlits()
     return header_flits;
 }
 
+
+
+// Modify: Change for more networks; based on Coord struct
 //Find the pointer to the link of a specific location
 Link* Network::getLink(Coord node_id, Direction direction)
 {
@@ -251,6 +279,7 @@ Link* Network::getLink(Coord node_id, Direction direction)
                link_id.y = node_id.y;
                link_id.z = node_id.z;
                break;
+        // Optional: Make sure that the link coordinates are correct.
         }
         if((link_id.x >= 0) && (link_id.x < net_width-1)
          &&(link_id.y >= 0) && (link_id.y < net_width)
@@ -290,6 +319,7 @@ Link* Network::getLink(Coord node_id, Direction direction)
                link_id.y = node_id.y;
                break;
         }
+        // Optional: Make sure that the link coordinates are correct.
         if((link_id.x >= 0) && (link_id.x < net_width-1)
          &&(link_id.y >= 0) && (link_id.y < 2*net_width)) {
             return link[link_id.x][link_id.y];
@@ -322,6 +352,9 @@ void Network::report(ofstream* result)
     *result << "Average network delay: " << avg_delay <<endl <<endl;
 }
 
+
+
+// Modify: Change for more networks; based on data structure for Link
 Network::~Network()
 {
     int i, j;
