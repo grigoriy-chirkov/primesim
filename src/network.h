@@ -42,6 +42,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 class Link;
 
+
+
+// Modify: define "Direction"
 enum Direction 
 {
     EAST = 0,
