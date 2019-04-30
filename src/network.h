@@ -79,8 +79,15 @@ typedef struct Coord
 class Network
 {
     public:
-       ~Network();
        bool init(int num_nodes_in, XmlNetwork* xml_net);
+       bool initXML(XmlNetwork* xml_net);
+       void initOmega();
+       void initButtefly();
+       void initTree();
+       void initCCC();
+       void init2DMesh();
+       void init3DMesh();
+
        uint64_t transmit(int sender, int receiver, int data_len, uint64_t timer);
        int getNumNodes();
        int getNetType();
@@ -88,8 +95,25 @@ class Network
        int getHeaderFlits();
        Coord getLoc(int node_id); 
        int getNodeId(Coord loc);
-       Link* getLink(Coord node_id, Direction direction);
        void report(ofstream* result);
+
+       Link* getLink(Coord node_id, Direction direction);
+
+       Link* getNextLinkOmega(int sender, int receiver);
+       Link* getNextLinkButterfly(int sender, int receiver);
+       Link* getNextLinkTree(int sender, int receiver);
+       Link* getNextLinkCCC(int sender, int receiver);
+       Link* getNextLink2DMesh(int sender, int receiver);
+       Link* getNextLink3DMesh(int sender, int receiver);
+
+       ~Network();
+       destroy2DMesh();
+       destroy3DMesh();
+       destroyOmega();
+       destroyTree();
+       destroyButterfly();
+       destroyCCC();
+
    private:
        int net_type;
        int num_nodes;

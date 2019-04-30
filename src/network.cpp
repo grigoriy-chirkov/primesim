@@ -45,56 +45,32 @@ using namespace std;
 
 bool Network::init(int num_nodes_in, XmlNetwork* xml_net)
 {
-    int i, j, k;
     num_nodes = num_nodes_in;
-    net_type = xml_net->net_type;
+    initXML(XmlNetwork* xml_net);
 
-
-
-    // Modify: define new net_width
-    if (net_type == MESH_3D) {
-        net_width = (int)ceil(cbrt(num_nodes));
+    switch (net_type) {
+        case MESH_3D:
+            init3DMesh();
+            break;
+        case MESH_2D:
+            init2DMesh();
+            break;
+        case OMEGA:
+            initOmega();
+            break;
+        case TREE:
+            initTree();
+            break;
+        case BUTTERFLY:
+            initButtefly();
+            break;
+        case CCC:
+            initCCC();
+            break;
+        default:
+            cerr << "Not supported network type: " << net_type << endl;
+            exit(1);
     }
-    else {
-        net_width = (int)ceil(sqrt(num_nodes));
-    }
-
-
-
-    header_flits = xml_net->header_flits;
-    data_width = xml_net->data_width;
-    router_delay = xml_net->router_delay;
-    link_delay = xml_net->link_delay;
-    inject_delay = xml_net->inject_delay;
-
-
-
-    // Modify: define new data structure for storing links
-    if (net_type == MESH_3D) {
-        link = new Link** [net_width-1];
-        for (i = 0; i < net_width-1; i++) {
-            link[i] = new Link* [net_width];
-            for (j = 0; j < net_width; j++) {
-                link[i][j] = new Link [3*net_width];
-                for (k = 0; k < 3*net_width; k++) {
-                    link[i][j][k].init(xml_net->link_delay);
-                }
-            }
-        }
-    }
-    else {
-        link = new Link** [net_width-1];
-        for (i = 0; i < net_width-1; i++) {
-            link[i] = new Link* [2*net_width];
-            for (j = 0; j < 2*net_width; j++) {
-                link[i][j] = new Link();
-                link[i][j]->init(xml_net->link_delay);
-            }
-        }
-
-    }
-
-
 
     num_access = 0;
     total_delay = 0;
@@ -105,6 +81,65 @@ bool Network::init(int num_nodes_in, XmlNetwork* xml_net)
     avg_delay = 0;
     pthread_mutex_init(&mutex, NULL);
     return true;
+}
+
+void Network::initXML(XmlNetwork* xml_net)
+{
+    net_type = xml_net->net_type;
+    header_flits = xml_net->header_flits;
+    data_width = xml_net->data_width;
+    router_delay = xml_net->router_delay;
+    link_delay = xml_net->link_delay;
+    inject_delay = xml_net->inject_delay;
+}
+
+void Network::init2DMesh()
+{
+    net_width = (int)ceil(sqrt(num_nodes));
+    link = new Link** [net_width-1];
+    for (int i = 0; i < net_width-1; i++) {
+        link[i] = new Link* [2*net_width];
+        for (int j = 0; j < 2*net_width; j++) {
+            link[i][j] = new Link();
+            link[i][j]->init(link_delay);
+        }
+    }
+}
+
+void Network::init3DMesh()
+{
+    net_width = (int)ceil(cbrt(num_nodes));
+    link = new Link** [net_width-1];
+    for (int i = 0; i < net_width-1; i++) {
+        link[i] = new Link* [net_width];
+        for (int j = 0; j < net_width; j++) {
+            link[i][j] = new Link [3*net_width];
+            for (int k = 0; k < 3*net_width; k++) {
+                link[i][j][k].init(link_delay);
+            }
+        }
+    }
+
+}
+
+void Network::initOmega()
+{
+    // Your code here
+}
+
+void Network::initButtefly()
+{
+    // Your code here
+}
+
+void Network::initTree()
+{
+    // Your code here
+}
+
+void Network::initCCC()
+{
+    // Your code here
 }
 
 //Calculate packet communication latency
@@ -234,6 +269,36 @@ int Network::getHeaderFlits()
     return header_flits;
 }
 
+Link* Network::getNextLinkOmega(int sender, int receiver)
+{
+    // Your code here
+}
+
+Link* Network::getNextLinkButterfly(int sender, int receiver)
+{
+    // Your code here
+}
+
+Link* Network::getNextLinkTree(int sender, int receiver)
+{
+    // Your code here
+}
+
+Link* Network::getNextLinkCCC(int sender, int receiver)
+{
+    // Your code here
+}
+
+Link* Network::getNextLink2DMesh(int sender, int receiver)
+{
+
+}
+
+Link* Network::getNextLink3DMesh(int sender, int receiver)
+{
+
+}
+
 
 
 // Modify: Change for more networks; based on Coord struct
@@ -352,30 +417,73 @@ void Network::report(ofstream* result)
     *result << "Average network delay: " << avg_delay <<endl <<endl;
 }
 
+void Network::destroy2DMesh()
+{
+    for (int i = 0; i < net_width-1; i++) {
+        for (int j = 0; j < 2*net_width; j++) {
+            delete link[i][j];
+        }
+        delete [] link[i];
+    } 
+    delete [] link;
+}
 
+void Network::destroy3DMesh()
+{
+    for (int i = 0; i < net_width-1; i++) {
+        for (int j = 0; j < net_width; j++) {
+            delete [] link[i][j];
+        }
+        delete [] link[i];
+    } 
+    delete [] link;
+}
 
-// Modify: Change for more networks; based on data structure for Link
+void Network::destroyOmega()
+{
+    // Your code here
+}
+
+void Network::destroyButtefly()
+{
+    // Your code here
+}
+
+void Network::destroyTree()
+{
+    // Your code here
+}
+
+void Network::destroyCCC()
+{
+    // Your code here
+}
+
 Network::~Network()
 {
-    int i, j;
-    if (net_type == MESH_3D) {
-        for (i = 0; i < net_width-1; i++) {
-            for (j = 0; j < net_width; j++) {
-                delete [] link[i][j];
-            }
-            delete [] link[i];
-        } 
-        delete [] link;
+    switch (net_type) {
+        case MESH_3D:
+            destroy3DMesh();
+            break;
+        case MESH_2D:
+            destroy2DMesh();
+            break;
+        case OMEGA:
+            destroyOmega();
+            break;
+        case TREE:
+            destroyTree();
+            break;
+        case BUTTERFLY:
+            destroyButtefly();
+            break;
+        case CCC:
+            destroyCCC();
+            break;
+        default:
+            cerr << "Not supported network type: " << net_type << endl;
+            exit(1);
     }
-    else {
-        for (i = 0; i < net_width-1; i++) {
-            for (j = 0; j < 2*net_width; j++) {
-                delete link[i][j];
-            }
-            delete [] link[i];
-        } 
-        delete [] link;
 
-    }
     pthread_mutex_destroy(&mutex);
 }
