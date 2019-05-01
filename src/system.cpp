@@ -969,16 +969,16 @@ void System::report(ofstream* result)
             *result << "Allocated home locations in 3D coordinates:" << endl;
             for (int i = 0; i < network.getNumNodes(); i++) {
                 if (home_stat[i]) {
-                    Coord loc = network.getLoc(i); 
+                    Coord loc = network.getLoc3D(i); 
                     *result << "("<<loc.x<<", "<<loc.y<<", "<<loc.z<<")\n";
                 }
             }
         }
-        else {
+        else if (network.getNetType() == MESH_2D){
             *result << "Allocated home locations in 2D coordinates:" << endl;
             for (int i = 0; i < network.getNumNodes(); i++) {
                 if (home_stat[i]) {
-                    Coord loc = network.getLoc(i); 
+                    Coord loc = network.getLoc2D(i); 
                     *result << "("<<loc.x<<", "<<loc.y<<")\n";
                 }
              }

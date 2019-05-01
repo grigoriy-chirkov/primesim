@@ -42,9 +42,18 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 class Link;
 
+enum NetworkType
+{
+    MESH_2D = 0,
+    MESH_3D = 1, 
+    OMEGA = 2, 
+    TREE = 3, 
+    BUTTERFLY = 4, 
+    CCC = 5
+};
 
 
-// Modify: define "Direction"
+// Mesh types
 enum Direction 
 {
     EAST = 0,
@@ -55,75 +64,83 @@ enum Direction
     DOWN = 5
 };
 
-
-
-
-// Modify: define new NetworkTypes
-enum NetworkType
-{
-    MESH_2D = 0,
-    MESH_3D = 1
-};
-
-
-
-// Modify: restructure for generality
 typedef struct Coord
 {
     int x;
     int y;
     int z;
+    Coord(int _x, int _y, int _z) : x(_x), y(_y), z(_z) {};
+    Coord() {};
 } Coord;
 
 
 class Network
 {
     public:
+       // Common
        bool init(int num_nodes_in, XmlNetwork* xml_net);
-       bool initXML(XmlNetwork* xml_net);
-       void initOmega();
-       void initButtefly();
-       void initTree();
-       void initCCC();
-       void init2DMesh();
-       void init3DMesh();
-
+       void initXML(XmlNetwork* xml_net);
        uint64_t transmit(int sender, int receiver, int data_len, uint64_t timer);
+       Link* getNextLink(int sender, int receiver);
        int getNumNodes();
        int getNetType();
        int getNetWidth();
        int getHeaderFlits();
-       Coord getLoc(int node_id); 
-       int getNodeId(Coord loc);
        void report(ofstream* result);
-
-       Link* getLink(Coord node_id, Direction direction);
-
-       Link* getNextLinkOmega(int sender, int receiver);
-       Link* getNextLinkButterfly(int sender, int receiver);
-       Link* getNextLinkTree(int sender, int receiver);
-       Link* getNextLinkCCC(int sender, int receiver);
-       Link* getNextLink2DMesh(int sender, int receiver);
-       Link* getNextLink3DMesh(int sender, int receiver);
-
        ~Network();
-       destroy2DMesh();
-       destroy3DMesh();
-       destroyOmega();
-       destroyTree();
-       destroyButterfly();
-       destroyCCC();
+
+       // 2D mesh
+       void init2DMesh();
+       Coord getLoc2D(int node_id); 
+       int getNodeId2D(Coord loc);
+       int getNodeId2D(int x, int y);
+       Link* getLinkFromDir2D(Coord node_id, Direction direction);
+       Link* getNextLink2DMesh(int sender, int receiver);
+       void destroy2DMesh();
+
+       // 3D mesh
+       void init3DMesh();
+       Coord getLoc3D(int node_id); 
+       int getNodeId3D(Coord loc);
+       int getNodeId3D(int x, int y, int z);
+       Link* getLinkFromDir3D(Coord node_id, Direction direction);
+       Link* getNextLink3DMesh(int sender, int receiver);
+       void destroy3DMesh();
+
+       // Omega
+       void initOmega();
+       Link* getNextLinkOmega(int sender, int receiver);
+       void destroyOmega();
+
+       // Butterfly
+       void initButtefly();
+       Link* getNextLinkButterfly(int sender, int receiver);
+       void destroyButterfly();
+
+       // Tree
+       void initTree();
+       Link* getNextLinkTree(int sender, int receiver);
+       void destroyTree();
+
+       // CCC
+       void initCCC();
+       Link* getNextLinkCCC(int sender, int receiver);
+       void destroyCCC();
 
    private:
        int net_type;
        int num_nodes;
-       int net_width;
        int data_width;
        int header_flits;
        uint64_t router_delay;
        uint64_t link_delay;
        uint64_t inject_delay;
        Link*** link;
+
+       // 2D, 3D mesh
+       int net_width;
+
+       // Stats
        uint64_t num_access;
        uint64_t total_delay;
        uint64_t total_router_delay;
@@ -131,8 +148,7 @@ class Network
        uint64_t total_inject_delay;
        uint64_t total_distance;
        double avg_delay;
-       pthread_mutex_t mutex;
-        
+       pthread_mutex_t mutex;      
 };
 
 

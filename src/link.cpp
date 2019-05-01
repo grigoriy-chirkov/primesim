@@ -41,8 +41,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 using namespace std;
 
-bool Link::init(uint64_t delay_in)
+bool Link::init(uint64_t delay_in, int id0, int id1)
 {
+    ids = std::make_pair(id0, id1);
     pthread_mutex_init(&mutex, NULL);
     delay = delay_in;
     link_queue = QueueModel::create("history_tree", delay);
@@ -57,6 +58,11 @@ uint64_t Link::access(uint64_t timer, int packet_len)
     uint64_t contention_delay = link_queue->computeQueueDelay(timer, packet_len);
     pthread_mutex_unlock(&mutex);
     return (contention_delay + delay);
+}
+
+std::pair<int, int> Link::get_ids()
+{
+    return ids;
 }
 
 Link::~Link()

@@ -43,10 +43,15 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 using namespace std;
 
+/////////////////////////////////////////////////////////////////
+//                  Common Functions
+/////////////////////////////////////////////////////////////////
+
+
 bool Network::init(int num_nodes_in, XmlNetwork* xml_net)
 {
     num_nodes = num_nodes_in;
-    initXML(XmlNetwork* xml_net);
+    initXML(xml_net);
 
     switch (net_type) {
         case MESH_3D:
@@ -85,6 +90,8 @@ bool Network::init(int num_nodes_in, XmlNetwork* xml_net)
 
 void Network::initXML(XmlNetwork* xml_net)
 {
+    assert(xml_net != nullptr);
+
     net_type = xml_net->net_type;
     header_flits = xml_net->header_flits;
     data_width = xml_net->data_width;
@@ -93,54 +100,6 @@ void Network::initXML(XmlNetwork* xml_net)
     inject_delay = xml_net->inject_delay;
 }
 
-void Network::init2DMesh()
-{
-    net_width = (int)ceil(sqrt(num_nodes));
-    link = new Link** [net_width-1];
-    for (int i = 0; i < net_width-1; i++) {
-        link[i] = new Link* [2*net_width];
-        for (int j = 0; j < 2*net_width; j++) {
-            link[i][j] = new Link();
-            link[i][j]->init(link_delay);
-        }
-    }
-}
-
-void Network::init3DMesh()
-{
-    net_width = (int)ceil(cbrt(num_nodes));
-    link = new Link** [net_width-1];
-    for (int i = 0; i < net_width-1; i++) {
-        link[i] = new Link* [net_width];
-        for (int j = 0; j < net_width; j++) {
-            link[i][j] = new Link [3*net_width];
-            for (int k = 0; k < 3*net_width; k++) {
-                link[i][j][k].init(link_delay);
-            }
-        }
-    }
-
-}
-
-void Network::initOmega()
-{
-    // Your code here
-}
-
-void Network::initButtefly()
-{
-    // Your code here
-}
-
-void Network::initTree()
-{
-    // Your code here
-}
-
-void Network::initCCC()
-{
-    // Your code here
-}
 
 //Calculate packet communication latency
 uint64_t Network::transmit(int sender, int receiver, int data_len, uint64_t timer)
@@ -148,104 +107,72 @@ uint64_t Network::transmit(int sender, int receiver, int data_len, uint64_t time
     if(sender == receiver) {
         return 0;
     }
-    assert(sender >= 0 && sender < num_nodes);
-    assert(receiver >= 0 && receiver < num_nodes);
+
     int packet_len = header_flits + (int)ceil((double)data_len/data_width); 
-    Coord loc_sender = getLoc(sender); 
-    Coord loc_receiver = getLoc(receiver); 
-    Coord loc_cur = loc_sender;
-    Direction direction;
+
     uint64_t    local_timer = timer;
-    uint64_t    local_distance = 0;
-    Link* link_cur;
+    uint64_t    distance = 0;
 
     //Injection delay
     local_timer += inject_delay;
     
-
-
-    // Modify: need to change based on the Coord struct
-    direction = loc_receiver.x > loc_cur.x ? EAST : WEST;
-    local_distance += abs(loc_receiver.x - loc_cur.x);
-    while (loc_receiver.x != loc_cur.x) {
-        local_timer += router_delay;
-        link_cur = getLink(loc_cur, direction);
-        assert(link_cur != NULL);
-        local_timer += link_cur->access(local_timer, packet_len);
-        loc_cur.x = (direction == EAST) ? (loc_cur.x + 1) : (loc_cur.x - 1);
+    while (sender != receiver) {
+        Link* link = getNextLink(sender, receiver);
+        assert(link != nullptr);
+        local_timer += link->access(local_timer, packet_len);
+        auto ids = link->get_ids();
+        if (ids.first == sender) {
+            sender = ids.second;
+        } else {
+            sender = ids.first;
+        }
+        distance++;
     }
-
-    direction = loc_receiver.y > loc_cur.y ? SOUTH : NORTH;
-    local_distance += abs(loc_receiver.y - loc_cur.y);
-    while (loc_receiver.y != loc_cur.y) {
-        local_timer += router_delay;
-        link_cur = getLink(loc_cur, direction);
-        assert(link_cur != NULL);
-        local_timer += link_cur->access(local_timer, packet_len);
-        loc_cur.y = (direction == SOUTH) ? (loc_cur.y + 1) : (loc_cur.y - 1);
-    }
- 
-    direction = loc_receiver.z > loc_cur.z ? UP : DOWN;
-    local_distance += abs(loc_receiver.z - loc_cur.z);
-    while (loc_receiver.z != loc_cur.z) {
-        local_timer += router_delay;
-        link_cur = getLink(loc_cur, direction);
-        assert(link_cur != NULL);
-        local_timer += link_cur->access(local_timer, packet_len);
-        loc_cur.z = (direction == UP) ? (loc_cur.z + 1) : (loc_cur.z - 1);
-    }
-
-
-
 
     local_timer += router_delay;
     //Pipe delay 
     local_timer += packet_len - 1; 
  
-
+    // stats
     pthread_mutex_lock(&mutex);
     num_access++;
     total_delay += local_timer - timer;
-    total_router_delay += (local_distance+1) * router_delay;
-    total_link_delay += local_timer - timer - (local_distance+1)*router_delay - (packet_len-1) - inject_delay;
+    total_router_delay += (distance+1) * router_delay;
+    total_link_delay += local_timer - timer - (distance+1)*router_delay - (packet_len-1) - inject_delay;
     total_inject_delay += inject_delay;
-    total_distance += local_distance;
+    total_distance += distance;
     pthread_mutex_unlock(&mutex);
     return (local_timer - timer);
 }
 
-
-
-// Modify: Change for more networks; based on Coord struct
-Coord Network::getLoc(int node_id)
+Link* Network::getNextLink(int sender, int receiver)
 {
-    Coord loc;
-    if (net_type == MESH_3D) {
-        loc.x = (node_id % (net_width * net_width)) % net_width;
-        loc.y = (node_id % (net_width * net_width)) / net_width;
-        loc.z = node_id / (net_width * net_width);
-    }
-    else {
-        loc.x = node_id % net_width;
-        loc.y = node_id / net_width;
-        loc.z = 0;
-    }
-    return loc;
-}
+    assert(receiver >= 0 && receiver < num_nodes);
 
-
-
-// Modify: Change for more networks; based on Coord struct
-int Network::getNodeId(Coord loc)
-{
-    int node_id;
-    if (net_type == MESH_3D) {
-        node_id = loc.x + loc.y * net_width + loc.z * net_width * net_width;
+    switch (net_type) {
+        case MESH_3D:
+            return getNextLink3DMesh(sender, receiver);
+            break;
+        case MESH_2D:
+            return getNextLink2DMesh(sender, receiver);
+            break;
+        case OMEGA:
+            return getNextLinkOmega(sender, receiver);
+            break;
+        case TREE:
+            return getNextLinkTree(sender, receiver);
+            break;
+        case BUTTERFLY:
+            return getNextLinkButterfly(sender, receiver);
+            break;
+        case CCC:
+            return getNextLinkCCC(sender, receiver);
+            break;
+        default:
+            cerr << "Not supported network type: " << net_type << endl;
+            return nullptr;
     }
-    else {
-        node_id = loc.x + loc.y * net_width;
-    }
-    return node_id;
+
 }
 
 int Network::getNumNodes()
@@ -263,147 +190,14 @@ int Network::getNetWidth()
     return net_width;
 }
 
-
 int Network::getHeaderFlits()
 {
     return header_flits;
 }
 
-Link* Network::getNextLinkOmega(int sender, int receiver)
-{
-    // Your code here
-}
-
-Link* Network::getNextLinkButterfly(int sender, int receiver)
-{
-    // Your code here
-}
-
-Link* Network::getNextLinkTree(int sender, int receiver)
-{
-    // Your code here
-}
-
-Link* Network::getNextLinkCCC(int sender, int receiver)
-{
-    // Your code here
-}
-
-Link* Network::getNextLink2DMesh(int sender, int receiver)
-{
-
-}
-
-Link* Network::getNextLink3DMesh(int sender, int receiver)
-{
-
-}
-
-
-
-// Modify: Change for more networks; based on Coord struct
-//Find the pointer to the link of a specific location
-Link* Network::getLink(Coord node_id, Direction direction)
-{
-    Coord link_id;
-    
-    if(net_type == MESH_3D) {
-        switch(direction) {
-            case EAST:
-               link_id.x = node_id.x; 
-               link_id.y = node_id.y;
-               link_id.z = node_id.z;
-               break;
-            case WEST:
-               link_id.x = node_id.x - 1; 
-               link_id.y = node_id.y;
-               link_id.z = node_id.z;
-               break;
-            case NORTH:
-               link_id.x = node_id.y - 1; 
-               link_id.y = node_id.z;
-               link_id.z = node_id.x + net_width;
-               break;
-            case SOUTH:
-               link_id.x = node_id.y; 
-               link_id.y = node_id.z;
-               link_id.z = node_id.x + net_width;
-               break;
-            case UP:
-               link_id.x = node_id.z; 
-               link_id.y = node_id.x;
-               link_id.z = node_id.y + 2 * net_width;
-               break;
-            case DOWN:
-               link_id.x = node_id.z - 1; 
-               link_id.y = node_id.x;
-               link_id.z = node_id.y + 2 * net_width;
-               break;
-            default:
-               link_id.x = node_id.x; 
-               link_id.y = node_id.y;
-               link_id.z = node_id.z;
-               break;
-        // Optional: Make sure that the link coordinates are correct.
-        }
-        if((link_id.x >= 0) && (link_id.x < net_width-1)
-         &&(link_id.y >= 0) && (link_id.y < net_width)
-         &&(link_id.z >= 0) && (link_id.y < 3*net_width)) {
-            return &link[link_id.x][link_id.y][link_id.z];
-        }
-        else {
-            cerr <<"# of nodes: "<<num_nodes<<endl;
-            cerr <<"Network width: "<<net_width<<endl;
-            cerr <<"Direction: "<<direction<<endl;
-            cerr <<"Node coordinate: ("<<node_id.x<<", "<<node_id.y<<", "<<node_id.z<<")\n";
-            cerr <<"Link coordinate: ("<<link_id.x<<", "<<link_id.y<<", "<<link_id.z<<")\n";
-            cerr <<"Can't find correct link id!\n";
-            return NULL;
-        }
-    }
-    else {
-        switch(direction) {
-            case EAST:
-               link_id.x = node_id.x; 
-               link_id.y = node_id.y;
-               break;
-            case WEST:
-               link_id.x = node_id.x - 1; 
-               link_id.y = node_id.y;
-               break;
-            case NORTH:
-               link_id.x = node_id.y - 1; 
-               link_id.y = node_id.x + net_width;
-               break;
-            case SOUTH:
-               link_id.x = node_id.y; 
-               link_id.y = node_id.x + net_width;
-               break;
-            default:
-               link_id.x = node_id.x; 
-               link_id.y = node_id.y;
-               break;
-        }
-        // Optional: Make sure that the link coordinates are correct.
-        if((link_id.x >= 0) && (link_id.x < net_width-1)
-         &&(link_id.y >= 0) && (link_id.y < 2*net_width)) {
-            return link[link_id.x][link_id.y];
-        }
-        else {
-            cerr <<"# of nodes: "<<num_nodes<<endl;
-            cerr <<"Network width: "<<net_width<<endl;
-            cerr <<"Direction: "<<direction<<endl;
-            cerr <<"Node coordinate: ("<<node_id.x<<", "<<node_id.y<<")\n";
-            cerr <<"Link coordinate: ("<<link_id.x<<", "<<link_id.y<<")\n";
-            cerr <<"Can't find correct link id!\n";
-            return NULL;
-        }
-    }
-}
-
-
 void Network::report(ofstream* result)
 {
+    assert(result != nullptr);
 
     avg_delay = (double)total_delay / num_access; 
     *result << "Network Stat:\n";
@@ -415,48 +209,6 @@ void Network::report(ofstream* result)
     *result << "Total inject delay: " << total_inject_delay <<endl;
     *result << "Total contention delay: " << total_link_delay - total_distance*link_delay <<endl;
     *result << "Average network delay: " << avg_delay <<endl <<endl;
-}
-
-void Network::destroy2DMesh()
-{
-    for (int i = 0; i < net_width-1; i++) {
-        for (int j = 0; j < 2*net_width; j++) {
-            delete link[i][j];
-        }
-        delete [] link[i];
-    } 
-    delete [] link;
-}
-
-void Network::destroy3DMesh()
-{
-    for (int i = 0; i < net_width-1; i++) {
-        for (int j = 0; j < net_width; j++) {
-            delete [] link[i][j];
-        }
-        delete [] link[i];
-    } 
-    delete [] link;
-}
-
-void Network::destroyOmega()
-{
-    // Your code here
-}
-
-void Network::destroyButtefly()
-{
-    // Your code here
-}
-
-void Network::destroyTree()
-{
-    // Your code here
-}
-
-void Network::destroyCCC()
-{
-    // Your code here
 }
 
 Network::~Network()
@@ -475,7 +227,7 @@ Network::~Network()
             destroyTree();
             break;
         case BUTTERFLY:
-            destroyButtefly();
+            destroyButterfly();
             break;
         case CCC:
             destroyCCC();
@@ -486,4 +238,353 @@ Network::~Network()
     }
 
     pthread_mutex_destroy(&mutex);
+}
+
+
+/////////////////////////////////////////////////////////////////
+//                  Topology-specific Functions
+/////////////////////////////////////////////////////////////////
+
+/*
+ *  2D mesh
+ */
+
+
+void Network::init2DMesh()
+{
+    assert(net_type == MESH_2D);
+    net_width = (int)ceil(sqrt(num_nodes));
+    link = new Link** [net_width-1];
+    assert(link != nullptr);
+    for (int i = 0; i < net_width-1; i++) {
+        link[i] = new Link* [2*net_width];
+        assert(link[i] != nullptr);
+        for (int j = 0; j < 2*net_width; j++) {
+            link[i][j] = new Link();
+            assert(link[i][j] != nullptr);
+            if (j < net_width) {
+                link[i][j]->init(link_delay, getNodeId2D(i, j), getNodeId2D(i+1, j));
+            } else {
+                link[i][j]->init(link_delay, getNodeId2D(j-net_width, i), getNodeId2D(j-net_width, i+1));
+            }
+        }
+    }
+}
+
+
+Link* Network::getNextLink2DMesh(int sender, int receiver)
+{
+    assert(net_type == MESH_2D);
+
+
+    Coord loc_sender = getLoc2D(sender); 
+    Coord loc_receiver = getLoc2D(receiver); 
+    Direction direction;
+
+    if (loc_receiver.x != loc_sender.x) {
+        direction = loc_receiver.x > loc_sender.x ? EAST : WEST;
+    } else if (loc_receiver.y != loc_sender.y) {
+        direction = loc_receiver.y > loc_sender.y ? SOUTH : NORTH;
+    } else {
+        cerr << "Node is asked to find link to itself" << endl;
+        return nullptr;
+    }
+
+    return getLinkFromDir2D(loc_sender, direction);
+}
+
+Link* Network::getLinkFromDir2D(Coord node_id, Direction direction) {
+    assert(net_type == MESH_2D);
+    Coord link_id;
+
+    switch(direction) {
+        case EAST:
+           link_id.x = node_id.x; 
+           link_id.y = node_id.y;
+           break;
+        case WEST:
+           link_id.x = node_id.x - 1; 
+           link_id.y = node_id.y;
+           break;
+        case NORTH:
+           link_id.x = node_id.y - 1; 
+           link_id.y = node_id.x + net_width;
+           break;
+        case SOUTH:
+           link_id.x = node_id.y; 
+           link_id.y = node_id.x + net_width;
+           break;
+        default:
+           link_id.x = node_id.x; 
+           link_id.y = node_id.y;
+           break;
+    }
+    // Optional: Make sure that the link coordinates are correct.
+    if((link_id.x >= 0) && (link_id.x < net_width-1)
+     &&(link_id.y >= 0) && (link_id.y < 2*net_width)) {
+        return link[link_id.x][link_id.y];
+    }
+    else {
+        cerr <<"# of nodes: "<<num_nodes<<endl;
+        cerr <<"Network width: "<<net_width<<endl;
+        cerr <<"Direction: "<<direction<<endl;
+        cerr <<"Node coordinate: ("<<node_id.x<<", "<<node_id.y<<")\n";
+        cerr <<"Link coordinate: ("<<link_id.x<<", "<<link_id.y<<")\n";
+        cerr <<"Can't find correct link id!\n";
+        return nullptr;
+    }
+}
+
+Coord Network::getLoc2D(int node_id)
+{
+    assert(net_type == MESH_2D);
+    Coord loc;
+    loc.x = node_id % net_width;
+    loc.y = node_id / net_width;
+    loc.z = 0;
+    return loc;
+}
+
+int Network::getNodeId2D(Coord loc)
+{
+    assert(net_type == MESH_2D);
+    return loc.x + loc.y * net_width;
+}
+
+int Network::getNodeId2D(int x, int y)
+{
+    assert(net_type == MESH_2D);
+    return x + y * net_width;
+}
+
+void Network::destroy2DMesh()
+{
+    assert(net_type == MESH_2D);
+    for (int i = 0; i < net_width-1; i++) {
+        for (int j = 0; j < 2*net_width; j++) {
+            delete link[i][j];
+        }
+        delete [] link[i];
+    } 
+    delete [] link;
+}
+
+/*
+ *  3D mesh
+ */
+
+void Network::init3DMesh()
+{
+    assert(net_type == MESH_3D);
+    net_width = (int)ceil(cbrt(num_nodes));
+    link = new Link** [net_width-1];
+    for (int i = 0; i < net_width-1; i++) {
+        link[i] = new Link* [net_width];
+        for (int j = 0; j < net_width; j++) {
+            link[i][j] = new Link [3*net_width];
+            for (int k = 0; k < 3*net_width; k++) {
+                if (k < net_width) {
+                    link[i][j][k].init(link_delay, getNodeId3D(i, j, k), getNodeId3D(i+1, j, k));
+                } else if (net_width <= k && k < 2*net_width) {
+                    link[i][j][k].init(link_delay, getNodeId3D(k-net_width, i, j), getNodeId3D(k-net_width, i+1, j));
+                } else {
+                    link[i][j][k].init(link_delay, getNodeId3D(j, k-2*net_width, i), getNodeId3D(j, k-2*net_width, i+1));
+                }
+
+            }
+        }
+    }
+}
+
+Link* Network::getNextLink3DMesh(int sender, int receiver)
+{
+    assert(net_type == MESH_3D);
+
+    Coord loc_sender = getLoc3D(sender); 
+    Coord loc_receiver = getLoc3D(receiver); 
+    Direction direction;
+
+    if (loc_receiver.x != loc_sender.x) {
+        direction = loc_receiver.x > loc_sender.x ? EAST : WEST;
+    } else if (loc_receiver.y != loc_sender.y) {
+        direction = loc_receiver.y > loc_sender.y ? SOUTH : NORTH;
+    } else if (loc_receiver.z != loc_sender.z) {
+        direction = loc_receiver.z > loc_sender.z ? UP : DOWN;
+    } else {
+        cerr << "Node is asked to find link to itself" << endl;
+        exit(1);
+    }
+
+    return getLinkFromDir3D(loc_sender, direction);
+}
+
+Link* Network::getLinkFromDir3D(Coord node_id, Direction direction) 
+{
+    assert(net_type == MESH_3D);
+    Coord link_id;
+
+    switch(direction) {
+        case EAST:
+           link_id.x = node_id.x; 
+           link_id.y = node_id.y;
+           link_id.z = node_id.z;
+           break;
+        case WEST:
+           link_id.x = node_id.x - 1; 
+           link_id.y = node_id.y;
+           link_id.z = node_id.z;
+           break;
+        case NORTH:
+           link_id.x = node_id.y - 1; 
+           link_id.y = node_id.z;
+           link_id.z = node_id.x + net_width;
+           break;
+        case SOUTH:
+           link_id.x = node_id.y; 
+           link_id.y = node_id.z;
+           link_id.z = node_id.x + net_width;
+           break;
+        case UP:
+           link_id.x = node_id.z; 
+           link_id.y = node_id.x;
+           link_id.z = node_id.y + 2 * net_width;
+           break;
+        case DOWN:
+           link_id.x = node_id.z - 1; 
+           link_id.y = node_id.x;
+           link_id.z = node_id.y + 2 * net_width;
+           break;
+        default:
+           link_id.x = node_id.x; 
+           link_id.y = node_id.y;
+           link_id.z = node_id.z;
+           break;
+    // Optional: Make sure that the link coordinates are correct.
+    }
+    if((link_id.x >= 0) && (link_id.x < net_width-1)
+     &&(link_id.y >= 0) && (link_id.y < net_width)
+     &&(link_id.z >= 0) && (link_id.y < 3*net_width)) {
+        return &link[link_id.x][link_id.y][link_id.z];
+    }
+    else {
+        return nullptr;
+    }
+}
+
+int Network::getNodeId3D(Coord loc)
+{
+    assert(net_type == MESH_3D);
+    return loc.x + loc.y * net_width + loc.z * net_width * net_width;
+}
+
+int Network::getNodeId3D(int x, int y, int z)
+{
+    assert(net_type == MESH_3D);
+    return x + y * net_width + z * net_width * net_width;
+}
+
+Coord Network::getLoc3D(int node_id)
+{
+    assert(net_type == MESH_3D);
+    Coord loc;
+    loc.x = (node_id % (net_width * net_width)) % net_width;
+    loc.y = (node_id % (net_width * net_width)) / net_width;
+    loc.z = node_id / (net_width * net_width);
+    return loc;
+}
+
+void Network::destroy3DMesh()
+{
+    assert(net_type == MESH_3D);
+    for (int i = 0; i < net_width-1; i++) {
+        for (int j = 0; j < net_width; j++) {
+            delete [] link[i][j];
+        }
+        delete [] link[i];
+    } 
+    delete [] link;
+}
+
+
+// Modify: Change for more networks; based on Coord struct
+
+
+/*
+ *  Omega
+ */
+
+void Network::initOmega()
+{
+    // Your code here
+}
+
+Link* Network::getNextLinkOmega(int sender, int receiver)
+{
+    // Your code here
+    return nullptr;
+}
+
+void Network::destroyOmega()
+{
+    // Your code here
+}
+
+/*
+ *  Butterfly
+ */
+
+void Network::initButtefly()
+{
+    // Your code here
+}
+
+Link* Network::getNextLinkButterfly(int sender, int receiver)
+{
+    // Your code here
+    return nullptr;
+}
+
+void Network::destroyButterfly()
+{
+    // Your code here
+}
+
+/*
+ *  Tree
+ */
+
+void Network::initTree()
+{
+    // Your code here
+}
+
+Link* Network::getNextLinkTree(int sender, int receiver)
+{
+    // Your code here
+    return nullptr;
+}
+
+void Network::destroyTree()
+{
+    // Your code here
+}
+
+/*
+ *  CCC
+ */
+
+void Network::initCCC()
+{
+    // Your code here
+}
+
+Link* Network::getNextLinkCCC(int sender, int receiver)
+{
+    // Your code here
+    return nullptr;
+}
+
+void Network::destroyCCC()
+{
+    // Your code here
 }

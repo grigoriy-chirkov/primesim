@@ -41,9 +41,11 @@ class Link
 {
     public:
         ~Link();
-        bool init(uint64_t delay_in);
+        bool init(uint64_t delay_in, int id0, int id1);
         uint64_t access(uint64_t timer, int packet_len);
+        std::pair<int, int> get_ids();
     private:
+        std::pair<int, int> ids;
         uint64_t delay;
         pthread_mutex_t mutex;
         QueueModel *link_queue;
