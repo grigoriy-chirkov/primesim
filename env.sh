@@ -38,7 +38,7 @@ export -f mpiexec
 export pin='pin -ifeellucky'
 
 # home directory for PriME, set it to the correct path
-export PRIME_PATH=/home/gchirkov/tank/primesim
+export PRIME_PATH=`pwd`
 
 # home directory for Pin, set it to the correct path
 export PINPATH=/home/gchirkov/tank/pin-2.14-71313-gcc.4.4.7-linux

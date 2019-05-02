@@ -110,6 +110,8 @@ class Network
        // Omega
        void initOmega();
        Link* getNextLinkOmega(int sender, int receiver);
+       int  log2(int n);
+       bool is2Power(int n);
        void destroyOmega();
 
        // Butterfly

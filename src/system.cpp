@@ -45,7 +45,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 void System::init(XmlSys* xml_sys_in)
-{
+{    
     int i,j;
     xml_sys = xml_sys_in;
     sys_type = xml_sys->sys_type;
