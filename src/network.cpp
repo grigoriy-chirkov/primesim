@@ -85,6 +85,7 @@ bool Network::init(int num_nodes_in, XmlNetwork* xml_net)
     total_distance = 0;
     avg_delay = 0;
     pthread_mutex_init(&mutex, NULL);
+
     return true;
 }
 
@@ -103,13 +104,10 @@ void Network::initXML(XmlNetwork* xml_net)
 
 //Calculate packet communication latency
 uint64_t Network::transmit(int sender, int receiver, int data_len, uint64_t timer)
-{
-    cout << "HERE" << endl;
+{    
     if(sender == receiver) {
         return 0;
     }
-    cout << "NOT HERE" << endl;
-
 
     int packet_len = header_flits + (int)ceil((double)data_len/data_width); 
 
@@ -124,6 +122,7 @@ uint64_t Network::transmit(int sender, int receiver, int data_len, uint64_t time
         assert(link != nullptr);
         local_timer += link->access(local_timer, packet_len);
         auto ids = link->get_ids();
+        //cout << ids.first << " " << ids.second << endl;
         if (ids.first == sender) {
             sender = ids.second;
         } else {
@@ -155,22 +154,16 @@ Link* Network::getNextLink(int sender, int receiver)
     switch (net_type) {
         case MESH_3D:
             return getNextLink3DMesh(sender, receiver);
-            break;
         case MESH_2D:
             return getNextLink2DMesh(sender, receiver);
-            break;
         case OMEGA:
             return getNextLinkOmega(sender, receiver);
-            break;
         case TREE:
             return getNextLinkTree(sender, receiver);
-            break;
         case BUTTERFLY:
             return getNextLinkButterfly(sender, receiver);
-            break;
         case CCC:
             return getNextLinkCCC(sender, receiver);
-            break;
         default:
             cerr << "Not supported network type: " << net_type << endl;
             return nullptr;
@@ -520,26 +513,26 @@ void Network::initOmega()
 {
     assert(net_type == OMEGA);
     assert(is2Power(num_nodes));
-    int num_links = (log2(num_nodes) + 1) * num_nodes / 2;
 
     link = new Link** [log2(num_nodes) + 1];
     assert(link != nullptr);
 
     for (int i = 0; i < log2(num_nodes) + 1; i++) {
-        link[i] = new Link* [num_nodes / 2];
+        link[i] = new Link* [num_nodes];
         assert(link[i] != nullptr);
     
-        for (int j = 0; j < num_nodes / 2; j++) {
+        for (int j = 0; j < num_nodes; j++) {
             link[i][j] = new Link();
             assert(link[i][j] != nullptr);
-            
             if (i == 0) {
-                link[i][j]->init(link_delay, j, j%2 + num_nodes);
+                link[i][j]->init(link_delay, j, j%(num_nodes/2) + num_nodes);
             } else if (i == log2(num_nodes)) {
-                link[i][j]->init(link_delay, j/2 + num_nodes/2 * (1 + log2(num_nodes)), j);
+                link[i][j]->init(link_delay, j/2 + num_nodes/2 * (1+log2(num_nodes)), j);
             } else {
-                link[i][j]->init(link_delay, j/2 + num_nodes/2 * i, j%2 + num_nodes/2 * (i+1));
+                link[i][j]->init(link_delay, j/2 + num_nodes/2 * (1+i), j%(num_nodes/2) + num_nodes/2 * (i+2));
             }
+            //cout << i << " " << j << " " << link[i][j]->get_ids().first << " " << link[i][j]->get_ids().second << endl;
+
         }
     }
 }
@@ -551,7 +544,7 @@ int Network::log2(int n)
         return 0;
     }
     while(n != 1) {
-        n >> 1;
+        n = n >> 1;
         res++;
     }
     return res;
@@ -564,6 +557,7 @@ bool Network::is2Power(int n)
 
 Link* Network::getNextLinkOmega(int sender, int receiver)
 {
+    //cout << sender << " " << receiver << endl;
     assert(net_type == OMEGA);
     if (sender == receiver) {
         return nullptr;
@@ -572,16 +566,18 @@ Link* Network::getNextLinkOmega(int sender, int receiver)
         return link[0][sender];
     }
     int column = (sender - num_nodes) / (num_nodes / 2) + 1;
-    int row = sender - num_nodes - column * num_nodes/2;
-    int direction = (receiver >> (column-1)) & 0x1;
+    int row = sender - num_nodes - (column - 1) * num_nodes/2;
+    int direction = (receiver >> (log2(num_nodes) - column)) & 0x1;
+    //cout << column << " " << row << " " << direction << endl;
+    //cout << link[column][2 * row + direction]->get_ids().first << " " << link[column][2 * row + direction]->get_ids().second << endl;
     return link[column][2 * row + direction];
 }
 
 void Network::destroyOmega()
 {
     assert(net_type == OMEGA);
-    for (int i = 0; i < net_width-1; i++) {
-        for (int j = 0; j < 2*net_width; j++) {
+    for (int i = 0; i < log2(num_nodes) + 1; i++) {
+        for (int j = 0; j < num_nodes; j++) {
             delete link[i][j];
         }
         delete [] link[i];

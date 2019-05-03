@@ -35,6 +35,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <string>
 #include <cstring>
 #include <inttypes.h>
+#include <cassert>
 
 #include "link.h"
 
@@ -47,6 +48,7 @@ bool Link::init(uint64_t delay_in, int id0, int id1)
     pthread_mutex_init(&mutex, NULL);
     delay = delay_in;
     link_queue = QueueModel::create("history_tree", delay);
+    assert(link_queue != nullptr);
     return true;
 }
 

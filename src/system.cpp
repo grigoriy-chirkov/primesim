@@ -576,7 +576,6 @@ int System::inval_children(Cache* cache_cur, InsMem* ins_mem)
 //Access inclusive directory cache without backup directory
 int System::accessDirectoryCache(int cache_id, int home_id, InsMem* ins_mem, int64_t timer, char* state)
 {
-
     if (!directory_cache_init_done[home_id]) {
         init_directories(home_id); 
     }

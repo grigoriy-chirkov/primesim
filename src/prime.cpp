@@ -50,7 +50,8 @@ void *msgHandler(void *t)
     memset(msg_mem[1], 0, (max_msg_size + 1)*sizeof(MsgMem));
     memset(&ins_mem, 0, sizeof(ins_mem));
     while (1) {
-        MPI_Recv(msg_mem[index_prev], (max_msg_size + 1)*sizeof(MsgMem), MPI_CHAR, MPI_ANY_SOURCE, (int)rec_thread , MPI_COMM_WORLD, &local_status);
+        MPI_Recv(msg_mem[index_prev], (max_msg_size + 1)*sizeof(MsgMem), MPI_CHAR, MPI_ANY_SOURCE, (int)rec_thread , MPI_COMM_WORLD, &local_status);        
+        
         //Receive a msg indicating a new process
         if (msg_mem[index_prev][0].message_type == PROCESS_STARTING) {
             pthread_mutex_lock (&mutex);
@@ -134,6 +135,7 @@ void *msgHandler(void *t)
                 }
             }
             MPI_Send(&delay, 1, MPI_INT, local_status.MPI_SOURCE , thread_id, MPI_COMM_WORLD);
+
         }
     }
 
