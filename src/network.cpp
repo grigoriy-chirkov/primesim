@@ -593,7 +593,7 @@ void Network::initButtefly()
 {
     assert(net_type == BUTTERFLY);
     assert(is2Power(num_nodes));
-    int lognum = log2(num_nodes)
+    int lognum = log2(num_nodes);
     link = new Link** [lognum];
     assert(link != nullptr);
 
