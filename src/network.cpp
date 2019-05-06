@@ -591,18 +591,59 @@ void Network::destroyOmega()
 
 void Network::initButtefly()
 {
-    // Your code here
+    assert(net_type == BUTTERFLY);
+    assert(is2Power(num_nodes));
+    int lognum = log2(num_nodes)
+    link = new Link** [lognum];
+    assert(link != nullptr);
+
+    for (int i = 0; i < lognum; i++) {
+        link[i] = new Link* [2*num_nodes];
+        assert(link[i] != nullptr);
+    
+        for (int j = 0; j < num_nodes; j++) {
+            link[i][2*j] = new Link();
+	    link[i][2*j+1] = new Link();
+            assert(link[i][2*j] != nullptr);
+            assert(link[i][2*j+1] != nullptr);
+	    if(i == (lognum-1)) {
+		link[i][2*j]->init(link_delay,i*num_nodes + j, j & ~(1));
+		link[i][2*j+1]->init(link_delay,i*num_nodes + j, j | 1);		
+	    }
+	    link[i][2*j]->init(link_delay,i*num_nodes + j, (i+1)*num_nodes + (j & ~(1<<(lognum - i - 1))));
+	    link[i][2*j+1]->init(link_delay,i*num_nodes + j, (i+1)*num_nodes + (j | (1<<(lognum - i - 1))));
+            //cout << i << " " << j << " " << link[i][j]->get_ids().first << " " << link[i][j]->get_ids().second << endl;
+
+        }
+    }
+    
 }
 
 Link* Network::getNextLinkButterfly(int sender, int receiver)
 {
-    // Your code here
-    return nullptr;
+    //cout << sender << " " << receiver << endl;
+    assert(net_type == BUTTERFLY);
+    if (sender == receiver) {
+        return nullptr;
+    }
+    int column = sender/num_nodes;
+    int row = sender%num_nodes;
+    int direction = (receiver >> (log2(num_nodes) - column - 1)) & 1;
+    //cout << column << " " << row << " " << direction << endl;
+    //cout << link[column][2 * row + direction]->get_ids().first << " " << link[column][2 * row + direction]->get_ids().second << endl;
+    return link[column][2 * row + direction];
 }
 
 void Network::destroyButterfly()
 {
-    // Your code here
+    assert(net_type == BUTTERFLY);
+    for (int i = 0; i < log2(num_nodes); i++) {
+        for (int j = 0; j < 2*num_nodes; j++) {
+            delete link[i][j];
+        }
+        delete [] link[i];
+    } 
+    delete [] link;
 }
 
 /*
