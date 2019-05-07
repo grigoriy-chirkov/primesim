@@ -107,7 +107,7 @@ cache = [
             {
             'level' : 2,
             # each L3 is shared by 64 cores
-            'share' : 64,
+            'share' : 1,
             'access_time' : 10,
             #4MB
             'size' : 4194304,
