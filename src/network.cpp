@@ -593,7 +593,7 @@ void Network::initButtefly()
 {
     assert(net_type == BUTTERFLY);
     assert(is2Power(num_nodes));
-    int lognum = log2(num_nodes)
+    int lognum = log2(num_nodes);
     link = new Link** [lognum];
     assert(link != nullptr);
 
@@ -606,12 +606,14 @@ void Network::initButtefly()
 	    link[i][2*j+1] = new Link();
             assert(link[i][2*j] != nullptr);
             assert(link[i][2*j+1] != nullptr);
-	    if(i == (lognum-1)) {
-		link[i][2*j]->init(link_delay,i*num_nodes + j, j & ~(1));
-		link[i][2*j+1]->init(link_delay,i*num_nodes + j, j | 1);		
-	    }
-	    link[i][2*j]->init(link_delay,i*num_nodes + j, (i+1)*num_nodes + (j & ~(1<<(lognum - i - 1))));
-	    link[i][2*j+1]->init(link_delay,i*num_nodes + j, (i+1)*num_nodes + (j | (1<<(lognum - i - 1))));
+            if(i==(lognum-1)){
+                link[i][2*j]->init(link_delay,i*num_nodes + j, j & ~1);
+	        link[i][2*j+1]->init(link_delay,i*num_nodes + j, j | 1); 
+            }
+            else {
+	        link[i][2*j]->init(link_delay,i*num_nodes + j, (i+1)*num_nodes + (j & ~(1<<(lognum - i - 1))));
+	        link[i][2*j+1]->init(link_delay,i*num_nodes + j, (i+1)*num_nodes + (j | (1<<(lognum - i - 1))));            
+            }
             //cout << i << " " << j << " " << link[i][j]->get_ids().first << " " << link[i][j]->get_ids().second << endl;
 
         }

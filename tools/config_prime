@@ -61,7 +61,7 @@ def print_dict(file, dictionary, ident = '    '):
 
 network = {
             # 0 -> 2D mesh, 1 -> 3D mesh, 2 -> Omega, 3 -> Tree, 4 -> Butterfly
-            'net_type'     : 0,
+            'net_type'     : 4,
             # the linker width of the network
             'data_width'   : 10,
             # the # of flits for the message header
@@ -107,7 +107,7 @@ cache = [
             {
             'level' : 2,
             # each L3 is shared by 64 cores
-            'share' : 64,
+            'share' : 1,
             'access_time' : 10,
             #4MB
             'size' : 4194304,

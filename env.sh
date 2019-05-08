@@ -51,7 +51,7 @@ export OPENMPI_LIB_PATH=\"\\\"/usr/local/openmpi/${MPI_VER}/${MPI_COMPILER}/x86_
 export LIBXML2_PATH=/usr/include/libxml2
 
 # path to PARSEC benchmarks, set it to the correct path if you want to run PARSEC
-export PARSEC_PATH=/home/gchirkov/tank/parsec-3.0
+export PARSEC_PATH=/home/rpathak/ele585/parsec-3.0
 #export PARSEC_PATH=/tigress/yfu/parsec-3.0
 
 # set path
