@@ -704,13 +704,28 @@ vector<int> Network::getPathNodeNode(Node* root, int nodeNum1, int nodeNum2)
 
 void Network::initTree()
 {
-    // Your code here
+    assert(net_type == TREE);
+    num_links = 2*(num_nodes-1);
+    link = new Link [num_links];
+    assert(link != nullptr);
+
+    // Instantiate links
+    delta = num_nodes
+    for (int i=0; i < num_links; i=i+2)
+    {
+        link[i]   = new Link();
+        link[i+1] = new Link();
+
+        link[i]   -> init(link_delay, i  , i+delta);
+        link[i+1] -> init(link_delay, i+1, i+delta-1);
+
+        delta = delta - 1;
+    }
 }
 
 Link* Network::getNextLinkTree(int sender, int receiver)
 {
-    // Your code here
-    return nullptr;
+
 }
 
 void Network::destroyTree()
