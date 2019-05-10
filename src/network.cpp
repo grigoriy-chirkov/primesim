@@ -34,6 +34,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <cmath>
 #include <string>
 #include <cstring>
+#include <vector>
 #include <inttypes.h>
 #include <assert.h>
 
@@ -703,7 +704,6 @@ int[] Network::getPathNodeNode(Node* root, int nodeNum1, int nodeNum2)
     }
     return pathNew;
 }
-
 
 
 void Network::initTree()
