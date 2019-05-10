@@ -645,6 +645,67 @@ void Network::destroyButterfly()
  *  Tree
  */
 
+// Recursively finds the path from root to Node with number nodeNum.
+bool Network::getPathRootNode(Node* root, vector<int>& path, int nodeNum)
+{
+    path.push_back(root->num);
+
+    // Current node is nodeNum
+    if(root->num == nodeNum)
+        return true;
+    // Recursively checks if nodeNum is in either the left or right subtree of the current node.
+    if(getPathRootNode(root->left, path, nodeNum) || getPath(root->right, path, nodeNum))
+        return true;
+    // nodeNum is not in this subtree; remove current node from path.
+    path.pop_back();
+        return false;
+}
+
+int[] Network::getPathNodeNode(Node* root, int nodeNum1, int nodeNum2)
+{
+    // Find paths from root node to both target nodes.
+    vector<int> path1;
+    vector<int> path2;
+    getPath(root, path1, nodeNum1);
+    getPath(root, path2, nodeNum2);
+
+    // Get intersection point
+    int intersection = -1;
+    int i = 0;
+    int j = 0;
+    while (i != path1.size() || j != path2.size())
+    {
+        if ((i == j) && (path1[i] == path2[j]))
+        {
+            i++;
+            j++;
+        }
+        else 
+        {
+            intersection = i - 1;
+            break;
+        }
+    }
+
+    // Returns path from nodeNum1 to nodeNum2
+    pathSize = path1.size() + path2.size() - 2*(intersection + 1) + 1;
+    int pathNew[pathSize];
+    int n = 0;
+    for (int i = path1.size() - 1; i > intersection - 1; i--)
+    {
+        pathNew[n] = path1[i];
+        n++;
+    }
+    for (int i = intersection + 1; i < path2.size(); i++)
+    {
+        pathNew[n] = path2[i];
+        n++;
+    }
+    return pathNew;
+}
+
+
+
 void Network::initTree()
 {
     // Your code here
