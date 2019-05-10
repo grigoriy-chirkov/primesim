@@ -76,19 +76,9 @@ typedef struct Coord
 // Node data structure (used for tree network type)
 typedef struct Node 
 {
-  int num
+  int num;
   Node *left, *right;
 } Node;
-
-// Creates new node given node number.
-Node* createNode(int num)
-{
-  Node* newNode  = new Node;
-  newNode->num   = num;
-  newNode->left  = NULL;
-  newNode->right = NULL;
-  return newNode;
-}
 
 class Network
 {

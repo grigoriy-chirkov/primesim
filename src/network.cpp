@@ -35,6 +35,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <string>
 #include <cstring>
 #include <vector>
+#include <queue>
 #include <inttypes.h>
 #include <assert.h>
 
@@ -646,6 +647,55 @@ void Network::destroyButterfly()
  *  Tree
  */
 
+// NODE FUNCTIONS
+
+// Creates new node given node number.
+Node* createNode(int num)
+{
+  Node* newNode  = new Node;
+  newNode->num   = num;
+  newNode->left  = NULL;
+  newNode->right = NULL;
+  return newNode;
+}
+
+Node* Network::insertNode(Node* root, int nodeNum, queue<Node *>& q)
+{
+    // Instantiate new node
+    Node* node = createNode(nodeNum);
+
+    // Assign node as root if root does not exist.
+    if(root == NULL)
+    {
+        root = node;
+    }
+    else if (q.front()->right == NULL)
+    {
+        q.front()->right = node;
+    }
+    else
+    {
+        q.front()->left = node;
+        q.pop();
+    }
+    q.push(node);
+    return root;
+}
+
+Node* Network::createTree()
+{
+    // Populate tree
+    int treeSize = 2*num_nodes-1;
+    Node* root = NULL;
+    queue<Node *> q;
+
+    for (int i = 0; i < treeSize; i++) 
+    {
+        root = insertNode(root, treeSize-1-i, q); 
+    }
+    return root; 
+}
+
 // Recursively finds the path from root to Node with number nodeNum.
 bool Network::getPathRootNode(Node* root, vector<int>& path, int nodeNum)
 {
@@ -659,9 +709,10 @@ bool Network::getPathRootNode(Node* root, vector<int>& path, int nodeNum)
         return true;
     // nodeNum is not in this subtree; remove current node from path.
     path.pop_back();
-        return false;
+    return false;
 }
 
+// Returns vector of node numbers in the path from nodeNum1 to nodeNum2
 vector<int> Network::getPathNodeNode(Node* root, int nodeNum1, int nodeNum2)
 {
     // Find paths from root node to both target nodes.
@@ -701,6 +752,7 @@ vector<int> Network::getPathNodeNode(Node* root, int nodeNum1, int nodeNum2)
     return pathNew;
 }
 
+// CORE FUNCTIONS
 
 void Network::initTree()
 {
@@ -748,7 +800,7 @@ void Network::destroyTree()
     num_links = 2*(num_nodes-1);
     for (int i=0; i < num_links)
     {
-        delete link[i]
+        delete link[i];
     }
 }
 
