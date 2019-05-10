@@ -662,11 +662,12 @@ bool Network::getPathRootNode(Node* root, vector<int>& path, int nodeNum)
         return false;
 }
 
-int[] Network::getPathNodeNode(Node* root, int nodeNum1, int nodeNum2)
+vector<int> Network::getPathNodeNode(Node* root, int nodeNum1, int nodeNum2)
 {
     // Find paths from root node to both target nodes.
     vector<int> path1;
     vector<int> path2;
+    vector<int> pathNew;
     getPath(root, path1, nodeNum1);
     getPath(root, path2, nodeNum2);
 
@@ -689,18 +690,13 @@ int[] Network::getPathNodeNode(Node* root, int nodeNum1, int nodeNum2)
     }
 
     // Returns path from nodeNum1 to nodeNum2
-    pathSize = path1.size() + path2.size() - 2*(intersection + 1) + 1;
-    int pathNew[pathSize];
-    int n = 0;
     for (int i = path1.size() - 1; i > intersection - 1; i--)
     {
-        pathNew[n] = path1[i];
-        n++;
+        pathNew.push_back(path1[i]);
     }
     for (int i = intersection + 1; i < path2.size(); i++)
     {
-        pathNew[n] = path2[i];
-        n++;
+        pathNew.push_back(path2[i]);
     }
     return pathNew;
 }
