@@ -721,16 +721,35 @@ void Network::initTree()
 
         delta = delta - 1;
     }
+
+    // CREATE TREE STRUCTURE TO GET root.
 }
 
 Link* Network::getNextLinkTree(int sender, int receiver)
 {
-
+    assert(net_type == TREE);
+    if (sender == receiver) {
+        return nullptr;
+    }
+    vector<int> path = getPathNodeNode(root, sender, reciever)
+    if (path[0] < path[1])
+    {
+        return link[path[0]];
+    }
+    else
+    {
+        return link[path[1]];
+    }
 }
 
 void Network::destroyTree()
 {
-    // Your code here
+    assert(net_type == TREE);
+    num_links = 2*(num_nodes-1);
+    for (int i=0; i < num_links)
+    {
+        delete link[i]
+    }
 }
 
 /*
