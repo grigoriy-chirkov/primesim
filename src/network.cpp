@@ -650,7 +650,7 @@ void Network::destroyButterfly()
 // NODE FUNCTIONS
 
 // Creates new node given node number.
-Node* createNode(int num)
+Node* Network::createNode(int num)
 {
   Node* newNode  = new Node;
   newNode->num   = num;
@@ -775,7 +775,7 @@ void Network::initTree()
         delta = delta - 1;
     }
 
-    // CREATE TREE STRUCTURE TO GET root.
+    root = createTree();
 }
 
 Link* Network::getNextLinkTree(int sender, int receiver)
@@ -784,7 +784,7 @@ Link* Network::getNextLinkTree(int sender, int receiver)
     if (sender == receiver) {
         return nullptr;
     }
-    vector<int> path = getPathNodeNode(root, sender, reciever);
+    vector<int> path = getPathNodeNode(root, sender, receiver);
     if (path[0] < path[1])
     {
         return link[0][path[0]];

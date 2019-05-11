@@ -154,6 +154,9 @@ class Network
        // 2D, 3D mesh
        int net_width;
 
+       // Tree
+       Node* root;
+
        // Stats
        uint64_t num_access;
        uint64_t total_delay;
