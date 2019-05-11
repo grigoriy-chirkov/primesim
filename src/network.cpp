@@ -705,7 +705,7 @@ bool Network::getPathRootNode(Node* root, vector<int>& path, int nodeNum)
     if(root->num == nodeNum)
         return true;
     // Recursively checks if nodeNum is in either the left or right subtree of the current node.
-    if(getPathRootNode(root->left, path, nodeNum) || getPath(root->right, path, nodeNum))
+    if(getPathRootNode(root->left, path, nodeNum) || getPathRootNode(root->right, path, nodeNum))
         return true;
     // nodeNum is not in this subtree; remove current node from path.
     path.pop_back();
@@ -719,8 +719,8 @@ vector<int> Network::getPathNodeNode(Node* root, int nodeNum1, int nodeNum2)
     vector<int> path1;
     vector<int> path2;
     vector<int> pathNew;
-    getPath(root, path1, nodeNum1);
-    getPath(root, path2, nodeNum2);
+    getPathRootNode(root, path1, nodeNum1);
+    getPathRootNode(root, path2, nodeNum2);
 
     // Get intersection point
     int intersection = -1;
@@ -757,19 +757,20 @@ vector<int> Network::getPathNodeNode(Node* root, int nodeNum1, int nodeNum2)
 void Network::initTree()
 {
     assert(net_type == TREE);
-    num_links = 2*(num_nodes-1);
-    link = new Link [num_links];
+    int num_links = 2*(num_nodes-1);
+    link    = new Link **[1];
+    link[0] = new Link *[num_links];
     assert(link != nullptr);
 
     // Instantiate links
-    delta = num_nodes
+    int delta = num_nodes;
     for (int i=0; i < num_links; i=i+2)
     {
-        link[i]   = new Link();
-        link[i+1] = new Link();
+        link[0][i]   = new Link();
+        link[0][i+1] = new Link();
 
-        link[i]   -> init(link_delay, i  , i+delta);
-        link[i+1] -> init(link_delay, i+1, i+delta-1);
+        link[0][i]   -> init(link_delay, i  , i+delta);
+        link[0][i+1] -> init(link_delay, i+1, i+delta-1);
 
         delta = delta - 1;
     }
@@ -783,22 +784,19 @@ Link* Network::getNextLinkTree(int sender, int receiver)
     if (sender == receiver) {
         return nullptr;
     }
-    vector<int> path = getPathNodeNode(root, sender, reciever)
+    vector<int> path = getPathNodeNode(root, sender, reciever);
     if (path[0] < path[1])
     {
-        return link[path[0]];
+        return link[0][path[0]];
     }
-    else
-    {
-        return link[path[1]];
-    }
+    return link[0][path[1]];
 }
 
 void Network::destroyTree()
 {
     assert(net_type == TREE);
-    num_links = 2*(num_nodes-1);
-    for (int i=0; i < num_links)
+    int num_links = 2*(num_nodes-1);
+    for (int i=0; i < num_links; i++)
     {
         delete link[i];
     }

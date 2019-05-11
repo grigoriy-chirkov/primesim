@@ -36,6 +36,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <map>
 #include <set>
 #include <vector>
+#include <queue>
 #include <pthread.h> 
 #include "link.h"
 #include "cache.h"
@@ -126,6 +127,11 @@ class Network
        void destroyButterfly();
 
        // Tree
+       Node* createNode(int num);
+       Node* insertNode(Node* root, int nodeNum, queue<Node *>& q);
+       Node* createTree();
+       bool getPathRootNode(Node* root, vector<int>& path, int nodeNum);
+       vector<int> getPathNodeNode(Node* root, int nodeNum1, int nodeNum2);
        void initTree();
        Link* getNextLinkTree(int sender, int receiver);
        void destroyTree();
