@@ -15,6 +15,7 @@ for n in [1,2,4,8,16,32,64]:
         for t in ["2dmesh", "butterfly", "omega", "tree"]:
             with open("jobs/%s_g%d_n%d_d%d.slurm" % (t, g, n, d), "w+") as f:
                 f.write("#!/bin/bash\n")
+                f.write("#SBATCH --nodes=1\n")
                 f.write("#SBATCH -B 1:4\n")
                 f.write("#SBATCH --time=20:00:00\n")
                 f.write("#SBATCH --mail-type=begin\n")
