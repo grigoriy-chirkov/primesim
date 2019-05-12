@@ -107,6 +107,7 @@ void Network::initXML(XmlNetwork* xml_net)
 //Calculate packet communication latency
 uint64_t Network::transmit(int sender, int receiver, int data_len, uint64_t timer)
 {    
+    cout << "New Transmit Call \n";
     if(sender == receiver) {
         return 0;
     }
@@ -118,8 +119,9 @@ uint64_t Network::transmit(int sender, int receiver, int data_len, uint64_t time
 
     //Injection delay
     local_timer += inject_delay;
-    
     while (sender != receiver) {
+        cout << "sender " << sender << "\n";
+        cout << "receiver " << receiver << "\n";
         Link* link = getNextLink(sender, receiver);
         assert(link != nullptr);
         local_timer += link->access(local_timer, packet_len);
@@ -641,6 +643,7 @@ void Network::destroyButterfly()
         delete [] link[i];
     } 
     delete [] link;
+    cout << "Calling destroy butterfly \n";
 }
 
 /*
@@ -699,8 +702,12 @@ Node* Network::createTree()
 // Recursively finds the path from root to Node with number nodeNum.
 bool Network::getPathRootNode(Node* root, vector<int>& path, int nodeNum)
 {
+  if (!root){
+    return false;
+  }
+    // cout << "Calling getPathRootNode\n";
     path.push_back(root->num);
-
+    // cout << "PUSHED " <<root->num << "\n";
     // Current node is nodeNum
     if(root->num == nodeNum)
         return true;
@@ -715,21 +722,26 @@ bool Network::getPathRootNode(Node* root, vector<int>& path, int nodeNum)
 // Returns vector of node numbers in the path from nodeNum1 to nodeNum2
 vector<int> Network::getPathNodeNode(Node* root, int nodeNum1, int nodeNum2)
 {
+    // cout << "Calling getPathNodeNode\n";
     // Find paths from root node to both target nodes.
     vector<int> path1;
     vector<int> path2;
     vector<int> pathNew;
     getPathRootNode(root, path1, nodeNum1);
     getPathRootNode(root, path2, nodeNum2);
-
+    // cout << "FOUND ROOT PATHS TO BOTH NODES \n";
     // Get intersection point
     int intersection = -1;
     int i = 0;
     int j = 0;
-    while (i != path1.size() || j != path2.size())
+    // cout << "PATH 1 SIZE: " << path1.size() << "\n";
+    // cout << "PATH 2 SIZE: " << path2.size() << "\n";
+    while (i != path1.size() &&  j != path2.size())
     {
         if ((i == j) && (path1[i] == path2[j]))
         {
+	  // cout << i << " SAME BRANCH: " << path1[i] << "\n" ;
+	  intersection = i;
             i++;
             j++;
         }
@@ -739,6 +751,7 @@ vector<int> Network::getPathNodeNode(Node* root, int nodeNum1, int nodeNum2)
             break;
         }
     }
+    // cout << "INTERSECTION LEVEL " << intersection  << "\n";
 
     // Returns path from nodeNum1 to nodeNum2
     for (int i = path1.size() - 1; i > intersection - 1; i--)
@@ -770,21 +783,36 @@ void Network::initTree()
         link[0][i+1] = new Link();
 
         link[0][i]   -> init(link_delay, i  , i+delta);
-        link[0][i+1] -> init(link_delay, i+1, i+delta-1);
+        link[0][i+1] -> init(link_delay, i+1, i+delta);
 
         delta = delta - 1;
     }
 
     root = createTree();
+    cout << "Successfully initialized tree" << "\n";
+    cout << "Root Node Number" <<root->num << "\n";
+    
+    for (int i=0; i < num_links; i++){
+      auto ids = link[0][i] -> get_ids();
+      cout << "Link #: " << i << "\n";
+      cout << ids.first << "\n";
+      cout << ids.second << "\n";
+    }
 }
 
 Link* Network::getNextLinkTree(int sender, int receiver)
 {
+    // cout << "Calling next link function \n";
     assert(net_type == TREE);
     if (sender == receiver) {
         return nullptr;
     }
     vector<int> path = getPathNodeNode(root, sender, receiver);
+    cout << "PATH: ";
+    for (int i=0; i <path.size(); i++){
+      cout << path[i] << " ";
+    }
+    cout << "\n";
     if (path[0] < path[1])
     {
         return link[0][path[0]];
@@ -794,6 +822,7 @@ Link* Network::getNextLinkTree(int sender, int receiver)
 
 void Network::destroyTree()
 {
+    cout << "Calling destroy tree function \n";
     assert(net_type == TREE);
     int num_links = 2*(num_nodes-1);
     for (int i=0; i < num_links; i++)
