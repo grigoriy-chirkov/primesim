@@ -40,7 +40,7 @@ from optparse import OptionParser
 import time
 
 
-def run_prime(config_path, output_path, progs):
+def run_prime(config_path, output_path, workdir, progs):
     timestr = time.strftime("%Y%m%d")
     cmd_num = 1
     
@@ -69,14 +69,14 @@ def run_prime(config_path, output_path, progs):
         if len(prog_split) == 3:  
             # 0 thread indicates serial execution
             if int(prog_split[1]) == 0:
-                f.write(' : -np 1 parsecmgmt -a run -p '+prog_split[0]+' -i '+prog_split[2]+' -c gcc-serial -s "'+
+                f.write(' : -np 1 parsecmgmt -a run -p '+prog_split[0]+' -d ' + workdir +' -i '+prog_split[2]+' -c gcc-serial -s "'+
                         'pin -ifeellucky -t '+prime_path+'/bin/prime.so -c '+ config_path + ' -o ' + output_path + ' --"')
             else:
                 if(prog_split[0] is 'freqmine'):
-                    f.write(' : -np 1 parsecmgmt -a run -p '+prog_split[0]+' -i '+prog_split[2]+' -n '+str(prog_split[1])+' -c gcc-openmp -s "'+
+                    f.write(' : -np 1 parsecmgmt -a run -p '+prog_split[0]+' -d ' + workdir +' -i '+prog_split[2]+' -n '+str(prog_split[1])+' -c gcc-openmp -s "'+
                             'pin -ifeellucky -t '+prime_path+'/bin/prime.so -c ' + config_path + ' -o ' + output_path + ' --"')
                 else:
-                    f.write(' : -np 1 parsecmgmt -a run -p '+prog_split[0]+' -i '+prog_split[2]+' -n '+str(prog_split[1])+' -c gcc-pthreads -s "'+
+                    f.write(' : -np 1 parsecmgmt -a run -p '+prog_split[0]+' -d ' + workdir + ' -i '+prog_split[2]+' -n '+str(prog_split[1])+' -c gcc-pthreads -s "'+
                             'pin -ifeellucky -t '+prime_path+'/bin/prime.so -c ' + config_path +' -o ' + output_path + ' --"')
         else:
             f.write(' : -np 1 pin -ifeellucky -t '+prime_path+'/bin/prime.so -c ' + config_path +' -o ' + output_path + ' -- ' + prog)
@@ -115,12 +115,16 @@ def main():
                       dest="output_path", default=prime_path + "/output/config.out",
                       metavar="OUTPUT_PATH", help="write the report to OUTPUT_PATH, the default output path is output/config.out")
 
+   parser.add_option("-d", "--dir_work",
+                      dest="dir_work", default=parsec_path,
+                      metavar="DIR_WORK", help="work dir for parsec")
+   
    (options, args) = parser.parse_args()
    if len(args) < 1:
         parser.error("Incorrect number of arguments")
    if options.config_and_run: 
         os.system('config_prime -o ' + options.config_path) 
-   run_prime(options.config_path, options.output_path, args)
+   run_prime(options.config_path, options.output_path, options.dir_work, args)
 
 
 if __name__ == "__main__":
