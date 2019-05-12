@@ -56,12 +56,44 @@ def print_dict(file, dictionary, ident = '    '):
 
 
 
-# On-chip network configuration
-# Note: all latencies are counted in cycles
 
-network = {
+
+
+def main():
+    prime_path  = os.environ.get('PRIME_PATH') 
+    usage = "config_prime [options]"
+    parser = OptionParser(usage=usage)
+    parser.add_option("-o", "--output_path",
+                      dest="output_path", default=prime_path + "/xml/config.xml",
+                      metavar="OUTPUT_PATH", help="output the configuration to OUTPUT_PATH, the default output path is xml/config.xml")
+
+    parser.add_option("-t", "--topology",
+                      dest="topology", default="2dmesh", choices=['2dmesh', 'tree', 'omega', 'butterfly'],
+                      metavar="TOPOLOGY", help="used topology, default is 2D mesh")
+   
+    parser.add_option("-c", "--cache_size",
+                      dest="cache_size", default=262144, type=int,
+                      metavar="CACHE_SIZE", help="size of the last level cache in bytes, default is 256K")
+   
+    parser.add_option("-n", "--ncores",
+                      dest="ncores", default=64, type=int,
+                      metavar="NCORES", help="number of cores, default is 1")
+   
+    parser.add_option("-d", "--delay",
+                      dest="delay", default=1, type=int,
+                      metavar="DELAY", help="link delay")
+   
+   
+   
+    (options, args) = parser.parse_args()
+
+    # On-chip network configuration
+    # Note: all latencies are counted in cycles
+    topology_dict = {"2dmesh":0, "omega":2, "tree":3, "butterfly":4}
+
+    network = {
             # 0 -> 2D mesh, 1 -> 3D mesh, 2 -> Omega, 3 -> Tree, 4 -> Butterfly
-            'net_type'     : 4,
+            'net_type'     : topology_dict[options.topology],
             # the linker width of the network
             'data_width'   : 10,
             # the # of flits for the message header
@@ -69,13 +101,13 @@ network = {
             # the router delay for each flit
             'router_delay' : 0,
             # the link delay for each flit 
-            'link_delay' : 1,
+            'link_delay' : options.delay,
             # the injection delay for each packet
             'inject_delay' : 1
-}
+    }
 
 # data cache hierarchies
-cache = [
+    cache = [
             # L1 cache
             {
             # level starts with 0
@@ -110,7 +142,7 @@ cache = [
             'share' : 1,
             'access_time' : 10,
             #4MB
-            'size' : 4194304,
+            'size' : options.cache_size,
             'block_size' : 64,
             'num_ways' : 16 
             }
@@ -119,7 +151,7 @@ cache = [
 
 # can be either distributed directory cache or shared llc with embedded 
 # directory cache determined by the shared_llc option in system config
-directory_cache = {
+    directory_cache = {
             # level and share values exit only for compatability. 
             # They are actually not used for the directory cache
             'level' : 0,
@@ -129,11 +161,11 @@ directory_cache = {
             'size' : 31457280,
             'block_size' : 64,
             'num_ways' : 24 
-}
+    }
 
 # TLB can be turned off by settng tlb_enable in system config to 0, address 
 # translation from vitual to physical is also turned off by doing this
-tlb_cache = {
+    tlb_cache = {
             # level and share values exit only for compatability. 
             # They are actually not used for the TLB cache
             'level' : 0,
@@ -143,10 +175,10 @@ tlb_cache = {
             'size' : 64,
             'block_size' : 1,
             'num_ways' : 64 
-}
+    }
 
 # simulated system config
-system = {
+    system = {
             # dram access latency
             'dram_access_time' : 120,
             # total # of levels in data cache hierarchy
@@ -154,7 +186,7 @@ system = {
             # avarage CPI for non-memory instructions, can be tuned to simulate different types of cores
             'cpi_nonmem' : 1,
             # core count
-            'num_cores' : 64,
+            'num_cores' : options.ncores,
             # 0 -> directory based, 1-> bus based
             'sys_type' : 0,
             # 0 -> full map, 1 -> limited pointer
@@ -179,10 +211,10 @@ system = {
             'cache': cache,
             'directory_cache': directory_cache,
             'tlb_cache': tlb_cache,
-}
+    }
 
-#simulator config 
-simulator = {
+    #simulator config 
+    simulator = {
             # maximum # of memory requests in one batched message
             'max_msg_size' : 100,
             # synchronization interval (in cycles) among threads within the same process
@@ -195,29 +227,18 @@ simulator = {
             # the # of threads in the uncore process
             'num_recv_threads': 1,
             'system' : system
-}
+    }
 
-
-
-def main():
-   prime_path  = os.environ.get('PRIME_PATH') 
-   usage = "config_prime [options]"
-   parser = OptionParser(usage=usage)
-   parser.add_option("-o", "--output_path",
-                      dest="output_path", default=prime_path + "/xml/config.xml",
-                      metavar="OUTPUT_PATH", help="output the configuration to OUTPUT_PATH, the default output path is xml/config.xml")
-
-   (options, args) = parser.parse_args()
-   f = open(options.output_path, 'w')
-   f.write('<?xml version = "1.0" encoding = "utf-8" standalone = "yes"?>\n\n')
-   f.write('<simulator>\n')
-   print_dict(f, simulator)
-   f.write('</simulator>\n')
-   f.close()
+    f = open(options.output_path, 'w')
+    f.write('<?xml version = "1.0" encoding = "utf-8" standalone = "yes"?>\n\n')
+    f.write('<simulator>\n')
+    print_dict(f, simulator)
+    f.write('</simulator>\n')
+    f.close()
 
 
 if __name__ == "__main__":
-   main()
+    main()
 
 
 
