@@ -1,5 +1,8 @@
 import os
 
+if not os.path.exists("jobs"):
+    os.makedirs("jobs")
+
 b_grouped = {0:["blackscholes", "bodytrack", "canneal"], 1:["dedup", "facesim"], 2:["ferret", "fluidanimate", "raytrace"], 3:["streamcluster", "swaptions"], 4:["vips", "x264"]}
 
 curdir = os.getcwd()
