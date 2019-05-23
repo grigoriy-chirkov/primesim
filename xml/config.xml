@@ -39,7 +39,7 @@
           <block_size>64</block_size>
           <size>262144</size>
        </cache>
-       <num_cores>4</num_cores>
+       <num_cores>64</num_cores>
        <page_size>4096</page_size>
        <page_miss_delay>200</page_miss_delay>
        <directory_cache>
