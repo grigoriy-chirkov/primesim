@@ -99,7 +99,6 @@ void CoreManager::insCount(uint32_t ins_count_in, THREADID threadid)
     ins_count[threadid]._count += ins_count_in;
 }
 
-
 // This function implements periodic barriers across all threads within one process and all processes 
 void CoreManager::barrier(THREADID threadid)
 {
@@ -137,6 +136,7 @@ void CoreManager::barrier(THREADID threadid)
                 for(int i = 0; i< max_threads; i++) {
                     if(((uint32_t)i != threadid) && thread_state[i] == WAIT) {
                         barrier_flag = 1;
+                        break;
                     }    
                 }
             }
@@ -144,7 +144,7 @@ void CoreManager::barrier(THREADID threadid)
         }
         barrier_counter++;
         if (barrier_counter == num_threads) {
-            if ((num_procs > 1) && ((int)(barrier_time/thread_sync_interval) % (int)(proc_sync_interval/thread_sync_interval) == 0)) {
+            if ((num_procs > 1) && (barrier_time % (proc_sync_interval) == 0)) {
                 msg_mem[threadid][0].message_type = INTER_PROCESS_BARRIERS;
 
                 MPI_Send(&msg_mem[threadid][0], sizeof(MsgMem), MPI_CHAR, 0, core[threadid], MPI_COMM_WORLD);
@@ -191,12 +191,7 @@ void CoreManager::barrier(THREADID threadid)
         thread_state[threadid] = ACTIVE;
         
     }
-    //Update barrier time in the initial single-threaded phase
-    else if (num_threads == 1 && num_procs == 1) {
-        barrier_time = cycle[threadid]._count;
-    }
 }
-
 
 
 // This function returns the average timer accoss all cores

@@ -34,6 +34,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <string>
 #include <inttypes.h>
 #include "queue_model.h"
+#include "xml_parser.h"
 
 using namespace std;
 
@@ -41,10 +42,13 @@ class Bus
 {
     public:
         ~Bus();
-        bool init(uint64_t delay_in);
-        uint64_t access(uint64_t timer);
+        bool init(XmlBus* xml_bus);
+        uint64_t access(uint64_t timer, bool is_data);
     private:
+        bool unlim_bw;
         uint64_t delay;
+        uint64_t data_pkt_len;
+        uint64_t ctrl_pkt_len;
         pthread_mutex_t mutex;
         QueueModel *bus_queue;
 };

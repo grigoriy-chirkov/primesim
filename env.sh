@@ -25,24 +25,33 @@
 #(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 #SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+# springdale 7 (from trin)
+export MPI_VER=1.10.2
+module load rh/devtoolset/7
+module load openmpi/intel-17.0/${MPI_VER}
+module load intel/17.0
+
+export MPI_COMPILER=intel170
+function mpiexec() { /usr/local/openmpi/${MPI_VER}/${MPI_COMPILER}/x86_64/bin/mpiexec "$@"; };
+export -f mpiexec
+
+export pin='pin -ifeellucky'
 
 # home directory for PriME, set it to the correct path
-export PRIME_PATH=/home/yfu/research/primesim
+export PRIME_PATH=`pwd`
 
 # home directory for Pin, set it to the correct path
-export PINPATH=/home/yfu/softwares/pin/pin-2.14-71313-gcc.4.4.7-linux
+export PINPATH=$PRIME_PATH/../pin-2.14-71313-gcc.4.4.7-linux
 
-# path to libmpi.so in OpenMPI library, set it to the correct path with the same 
-# format as below (including those backslashes and quotes). Besides, you need to 
-# make sure the library file and the default mpic++ used in the Makefile are of 
-# the same version
-export OPENMPI_LIB_PATH=\"\\\"/usr/local/lib/libmpi.so\\\"\"
+# Springdale 7
+export OPENMPI_PATH=\"\\\"/usr/local/openmpi/${MPI_VER}/${MPI_COMPILER}/x86_64/lib64/libmpi.so\\\"\"
+export OPENMPI_LIB_PATH=\"\\\"/usr/local/openmpi/${MPI_VER}/${MPI_COMPILER}/x86_64/lib64/libmpi.so\\\"\"
 
 # path to libxml2 , set it to the correct path
 export LIBXML2_PATH=/usr/include/libxml2
 
 # path to PARSEC benchmarks, set it to the correct path if you want to run PARSEC
-export PARSEC_PATH=/home/yfu/research/parsec-3.0
+export PARSEC_PATH=$PRIME_PATH/../parsec-3.0
 
 # set path
-export PATH=$PRIME_PATH/tools:$PATH
+export PATH=$PRIME_PATH/tools:$PINPATH/:$PATH

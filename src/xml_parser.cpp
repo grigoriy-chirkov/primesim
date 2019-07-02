@@ -59,7 +59,6 @@ XmlParser::XmlParser()
     xml_sim.sys.num_levels = 0;
     xml_sim.sys.freq = 0;
     xml_sim.sys.num_cores = 0;
-    xml_sim.sys.bus_latency = 0;
     xml_sim.sys.page_miss_delay = 0;
 
 
@@ -84,6 +83,11 @@ XmlParser::XmlParser()
     xml_sim.sys.network.inject_delay = 0;
     xml_sim.sys.network.router_delay = 0;
     xml_sim.sys.network.link_delay = 0;
+
+    xml_sim.sys.bus.delay = 0;
+    xml_sim.sys.bus.unlim_bw = false;
+    xml_sim.sys.bus.data_pkt_len = 0;
+    xml_sim.sys.bus.ctrl_pkt_len = 0;
 }
 
 
@@ -239,6 +243,15 @@ bool XmlParser::parseSys()
                 xmlFree(key);
                 item_count++;
  	        }
+            if ((!xmlStrcmp(cur->name, (const xmlChar *)"protocol"))) {
+                key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
+                convert.clear();
+                convert.str("");
+                convert << key;
+                convert >> dec >> xml_sim.sys.protocol;
+                xmlFree(key);
+                item_count++;
+            }
 	        if ((!xmlStrcmp(cur->name, (const xmlChar *)"max_num_sharers"))) {
 		        key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
                 convert.clear();
@@ -318,15 +331,6 @@ bool XmlParser::parseSys()
                 convert.str("");
 		        convert << key;
                 convert >> dec >> xml_sim.sys.num_cores;
-                xmlFree(key);
-                item_count++;
- 	        }
-            if ((!xmlStrcmp(cur->name, (const xmlChar *)"bus_latency"))) {
-		        key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
-                convert.clear();
-                convert.str("");
-		        convert << key;
-                convert >> dec >> xml_sim.sys.bus_latency;
                 xmlFree(key);
                 item_count++;
  	        }
@@ -435,6 +439,69 @@ bool XmlParser::parseNetwork()
 	}
     xmlXPathFreeObject(net_node);
     return (item_count == 4);
+}
+
+
+ //Parse the bus structure and store the result 
+bool XmlParser::parseBus()
+{
+    xmlXPathObjectPtr bus_node;
+    bus_node = getNodeSet((xmlChar*) "//bus");
+    
+   
+    if (bus_node->nodesetval->nodeNr != 1) {
+        xmlXPathFreeObject(bus_node);
+        return false;
+    }
+    
+    xmlNodePtr cur;
+    xmlChar*   key;
+    stringstream   convert;
+    int        i, item_count = 0;
+    for (i = 0; i < bus_node->nodesetval->nodeNr; i++) {
+        cur = bus_node->nodesetval->nodeTab[i]->xmlChildrenNode;
+        while (cur != NULL) {
+            if ((!xmlStrcmp(cur->name, (const xmlChar *)"delay"))) {
+                key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
+                convert.clear();
+                convert.str("");
+                convert << key;
+                convert >> dec >> xml_sim.sys.bus.delay;
+                xmlFree(key);
+                item_count++;
+            }
+            if ((!xmlStrcmp(cur->name, (const xmlChar *)"data_pkt_len"))) {
+                key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
+                convert.clear();
+                convert.str("");
+                convert << key;
+                convert >> dec >> xml_sim.sys.bus.data_pkt_len;
+                xmlFree(key);
+                item_count++;
+            }
+            if ((!xmlStrcmp(cur->name, (const xmlChar *)"ctrl_pkt_len"))) {
+                key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
+                convert.clear();
+                convert.str("");
+                convert << key;
+                convert >> dec >> xml_sim.sys.bus.ctrl_pkt_len;
+                xmlFree(key);
+                item_count++;
+            }
+            if ((!xmlStrcmp(cur->name, (const xmlChar *)"unlim_bw"))) {
+                key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
+                convert.clear();
+                convert.str("");
+                convert << key;
+                convert >> dec >> xml_sim.sys.bus.unlim_bw;
+                xmlFree(key);
+                //item_count++;
+            }
+        cur = cur->next;
+        }
+    }
+    xmlXPathFreeObject(bus_node);
+    return (item_count == 3);
 }
 
 
@@ -694,6 +761,10 @@ bool XmlParser::parse(const char *docname)
         }
         else if (!parseNetwork()) {
             cerr << "Error in parsing network structure!\n";
+            return false;
+        }
+        else if (!parseBus()) {
+            cerr << "Error in parsing bus structure!\n";
             return false;
         }
         else if (!parseDirectoryCache()) {

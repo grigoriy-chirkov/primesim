@@ -48,6 +48,12 @@ typedef enum SysType
     BUS = 1
 } SysType;
 
+typedef enum 
+{
+    MESI = 0,
+    WRITE_UPDATE = 1
+} Protocol;
+
 typedef enum ProtocolType
 {
     FULL_MAP = 0,
@@ -85,11 +91,14 @@ class System
         void init_directories(int home_id);
         int access(int core_id, InsMem* ins_mem, int64_t timer);
         char mesi_bus(Cache* cache_cur, int level, int cache_id, int core_id, InsMem* ins_mem, int64_t timer);
+        char write_update_bus(Cache* cache_cur, int level, int cache_id, int core_id, InsMem* ins_mem, int64_t timer);
         char mesi_directory(Cache* cache_cur, int level, int cache_id, int core_id, InsMem* ins_mem, int64_t timer);
         int share(Cache* cache_cur, InsMem* ins_mem);
         int share_children(Cache* cache_cur, InsMem* ins_mem);
         int inval(Cache* cache_cur, InsMem* ins_mem);
         int inval_children(Cache* cache_cur, InsMem* ins_mem);
+        int modify(Cache* cache_cur, InsMem* ins_mem);
+        int modify_children(Cache* cache_cur, InsMem* ins_mem);
         int accessDirectoryCache(int cache_id, int home_id, InsMem* ins_mem, int64_t timer, char* state);
         int accessSharedCache(int cache_id, int home_id, InsMem* ins_mem, int64_t timer, char* state);
         int allocHomeId(int num_homes, uint64_t addr);
@@ -101,6 +110,7 @@ class System
     private:
         int        sys_type;
         int        protocol_type;
+        int        protocol;
         int        max_num_sharers;
         int        num_cores;
         int        dram_access_time;
@@ -126,7 +136,8 @@ class System
         PageTable  page_table;
         Network    network;
         Dram       dram;
-
+        Bus**      bus;
+        Bus*       directory_cache_bus;
 };
 
 #endif // SYSTEM_H

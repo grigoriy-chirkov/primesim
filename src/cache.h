@@ -106,7 +106,7 @@ class Cache
         Cache*      parent;
         Cache**     child;
         Bus*        bus;
-        void init(XmlCache* xml_cache, CacheType cache_type_in, int bus_latency, int page_size_in, int level_in, int cache_id_in);
+        void init(XmlCache* xml_cache, Bus* bus_in, CacheType cache_type_in, int page_size_in, int level_in, int cache_id_in);
         Line* accessLine(InsMem* ins_mem);
         Line* directAccess(int set, int way, InsMem* ins_mem);
         Line* replaceLine(InsMem* ins_mem_old, InsMem* ins_mem);

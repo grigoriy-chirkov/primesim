@@ -41,21 +41,40 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 using namespace std;
 
-bool Bus::init(uint64_t delay_in)
+bool Bus::init(XmlBus* xml_bus)
 {
-    delay = delay_in;
-    bus_queue = QueueModel::create("history_tree", delay);
-    pthread_mutex_init(&mutex, NULL);
+    if (xml_bus == NULL) {
+      delay = 0;
+      unlim_bw = false;
+      data_pkt_len = 0;
+      ctrl_pkt_len = 0;
+    } else {
+      delay = xml_bus->delay;
+      unlim_bw = xml_bus->unlim_bw;
+      data_pkt_len = xml_bus->data_pkt_len;
+      ctrl_pkt_len = xml_bus->ctrl_pkt_len;      
+    }
+    
+    if (!unlim_bw) {
+      bus_queue = QueueModel::create("history_tree", delay);
+      pthread_mutex_init(&mutex, NULL);
+    }
+
     return true;
 }
 
 // This function returns bus contention_delay only because bus access time is 
 // included in cache access time
 
-uint64_t Bus::access(uint64_t timer)
+uint64_t Bus::access(uint64_t timer, bool is_data)
 {
+    if (unlim_bw) {
+      return 0;
+    }
+
+    int pkt_len = is_data ? data_pkt_len : ctrl_pkt_len;
     pthread_mutex_lock(&mutex);
-    uint64_t contention_delay = bus_queue->computeQueueDelay(timer, delay); 
+    uint64_t contention_delay = bus_queue->computeQueueDelay(timer, pkt_len*delay); 
     pthread_mutex_unlock(&mutex);
     return contention_delay;
 }
@@ -63,6 +82,8 @@ uint64_t Bus::access(uint64_t timer)
 
 Bus::~Bus()
 {
-    pthread_mutex_destroy(&mutex);
-    delete bus_queue;
+    if (!unlim_bw) {
+        pthread_mutex_destroy(&mutex);
+        delete bus_queue;     
+    }
 }

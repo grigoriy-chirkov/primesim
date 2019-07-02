@@ -65,12 +65,21 @@ typedef struct XmlNetwork
     uint64_t inject_delay;
 } XmlNetwork;
 
+typedef struct XmlBus
+{
+    int delay;
+    bool unlim_bw;
+    int ctrl_pkt_len;
+    int data_pkt_len;
+} XmlBus;
+
 
 
 typedef struct XmlSys
 {
     int        sys_type;
     int        protocol_type;
+    int        protocol;
     int        max_num_sharers;
     int        page_size;
     int        tlb_enable;
@@ -81,9 +90,9 @@ typedef struct XmlSys
     int        num_levels;
     int        num_cores;
     double     freq;
-    int        bus_latency;
     int        page_miss_delay;
     XmlNetwork network;
+    XmlBus     bus;
     XmlCache   directory_cache;
     XmlCache   tlb_cache;
     XmlCache*  cache;
@@ -108,6 +117,7 @@ class XmlParser
         bool getDoc(const char *docname);
         xmlXPathObjectPtr getNodeSet(xmlChar *xpath);
         bool parseCache(); 
+        bool parseBus(); 
         bool parseNetwork(); 
         bool parseDirectoryCache(); 
         bool parseTlbCache(); 

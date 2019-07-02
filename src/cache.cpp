@@ -47,7 +47,7 @@ using namespace std;
 
 
 
-void Cache::init(XmlCache* xml_cache, CacheType cache_type_in, int bus_latency, int page_size_in, int level_in, int cache_id_in)
+void Cache::init(XmlCache* xml_cache, Bus* bus_in, CacheType cache_type_in, int page_size_in, int level_in, int cache_id_in)
 {
     ins_count = 0;;
     miss_count = 0;
@@ -111,13 +111,9 @@ void Cache::init(XmlCache* xml_cache, CacheType cache_type_in, int bus_latency, 
     else {
         cerr << "Error: Undefined cache type!\n";
     }
-    if (xml_cache->share > 1) {
-        bus = new Bus;
-        bus->init(bus_latency);
-    }
-    else {
-        bus = NULL;
-    }
+
+    bus = bus_in;
+
 }
 
 
@@ -461,9 +457,9 @@ Cache::~Cache()
     else {
         cerr << "Error: Undefined cache type!\n";
     }
-    if (bus != NULL) {
-        delete bus;
-    }
+    //if (bus != NULL) {
+    //    delete bus;
+    //}
 }
 
 

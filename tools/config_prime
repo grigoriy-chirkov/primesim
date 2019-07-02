@@ -74,6 +74,19 @@ network = {
             'inject_delay' : 1
 }
 
+# Mesi bus configuration
+# Note: all latencies are counted in cycles
+
+bus = {
+            # bus delay
+            'delay'     : 2,
+            # unlimited bus bandwidth, 0->false, 1->true
+            'unlim_bw'   : 1,
+            #
+            'data_pkt_len' : 1,
+            'ctrl_pkt_len' : 1
+}
+
 # data cache hierarchies
 cache = [
             # L1 cache
@@ -85,36 +98,12 @@ cache = [
             # hit latency
             'access_time' : 1,      
             # cache size in Byte
-            'size' : 32768,
+            'size' : 2**20,
             # block size in Byte
             'block_size' : 64,
             # associativity
             'num_ways' : 8 
-            },
-            # L2 cache
-            {
-            'level' : 1,
-            #private L2
-            'share' : 1,
-            # hit latency
-            'access_time' : 5,
-            # 256KB
-            'size' : 262144,
-            'block_size' : 64,
-            'num_ways' : 8 
-            },
-            # L3 cache
-            {
-            'level' : 2,
-            # each L3 is shared by 64 cores
-            'share' : 64,
-            'access_time' : 10,
-            #4MB
-            'size' : 4194304,
-            'block_size' : 64,
-            'num_ways' : 16 
             }
-
         ]
 
 # can be either distributed directory cache or shared llc with embedded 
@@ -150,15 +139,17 @@ system = {
             # dram access latency
             'dram_access_time' : 120,
             # total # of levels in data cache hierarchy
-            'num_levels' : 3,
+            'num_levels' : 1,
             # avarage CPI for non-memory instructions, can be tuned to simulate different types of cores
             'cpi_nonmem' : 1,
             # core count
-            'num_cores' : 64,
+            'num_cores' : 1024,
             # 0 -> directory based, 1-> bus based
-            'sys_type' : 0,
+            'sys_type' : 1,
             # 0 -> full map, 1 -> limited pointer
             'protocol_type' : 0,
+            # 0 -> mesi, 1 -> write_update
+            'protocol' : 0,
             # only used for limited pointers
             'max_num_sharers' : 6,
             # page size in Byte
@@ -171,14 +162,13 @@ system = {
             'verbose_report' : 1,
             # simulation frequency in GHz
             'freq' : 2.5,
-            # bus latency between different cache levels
-            'bus_latency' : 2,
             # latency upon a page miss
             'page_miss_delay' : 200,
             'network': network,
             'cache': cache,
             'directory_cache': directory_cache,
             'tlb_cache': tlb_cache,
+            'bus': bus,
 }
 
 #simulator config 
@@ -208,12 +198,23 @@ def main():
                       metavar="OUTPUT_PATH", help="output the configuration to OUTPUT_PATH, the default output path is xml/config.xml")
 
    (options, args) = parser.parse_args()
-   f = open(options.output_path, 'w')
+
+   #pin file
+   f = open(os.path.splitext(options.output_path)[0] + "_pin.xml", 'w')
    f.write('<?xml version = "1.0" encoding = "utf-8" standalone = "yes"?>\n\n')
    f.write('<simulator>\n')
    print_dict(f, simulator)
    f.write('</simulator>\n')
    f.close()
+
+   #prime file
+   f = open(os.path.splitext(options.output_path)[0] + "_prime.xml", 'w')
+   f.write('<?xml version = "1.0" encoding = "utf-8" standalone = "yes"?>\n\n')
+   f.write('<simulator>\n')
+   print_dict(f, simulator)
+   f.write('</simulator>\n')
+   f.close()
+
 
 
 if __name__ == "__main__":
