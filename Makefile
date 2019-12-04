@@ -27,12 +27,11 @@
 ##############################################################################
 
 
-
 SIM_ROOT ?= $(PRIME_PATH)
 PIN_VERSION_SCRIPT = $(shell find $(PINPATH) -name pintool.ver)
 GRAPHITE_PATH = $(SIM_ROOT)/src/Graphite
 
-TOP_LEVEL_PROGRAM_NAME := bin/prime.so bin/prime
+TOP_LEVEL_PROGRAM_NAME := bin/prime.so bin/prime example
 CXX_FILES := $(wildcard src/*.cpp src/Graphite/*.cpp)
 DEP_FILES := $(CXX_FILES:src/%.cpp=dep/%.d)
 O_FILES := $(filter-out obj/core_manager.o, $(filter-out obj/pin_prime.o, $(CXX_FILES:src/%.cpp=obj/%.o)))
@@ -103,8 +102,11 @@ bin/prime: $(O_FILES)
 bin/prime.so: $(PIN_O_FILES)
 	mpic++ $^ -o $@ $(PIN_LD_FLAGS)
 
+example: example.c
+	gcc example.c -lpthread -O0 -o example
+
 clean:
-	rm -f dep/*.d dep/Graphite/*.d obj/*.o obj/Graphite/*.o bin/* 
+	rm -f dep/*.d dep/Graphite/*.d obj/*.o obj/Graphite/*.o bin/* example 
 
 remove:
 	rm -f dep/*.d dep/Graphite/*.d obj/*.o obj/Graphite/*.o bin/* xml/*.xml cmd/*

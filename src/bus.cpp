@@ -44,19 +44,20 @@ using namespace std;
 bool Bus::init(XmlBus* xml_bus)
 {
     if (xml_bus == NULL) {
-      delay = 0;
       unlim_bw = false;
       data_pkt_len = 0;
       ctrl_pkt_len = 0;
+      bandwidth = 0;
     } else {
-      delay = xml_bus->delay;
       unlim_bw = xml_bus->unlim_bw;
       data_pkt_len = xml_bus->data_pkt_len;
-      ctrl_pkt_len = xml_bus->ctrl_pkt_len;      
+      ctrl_pkt_len = xml_bus->ctrl_pkt_len;    
+      bandwidth = xml_bus->bandwidth;  
     }
     
     if (!unlim_bw) {
-      bus_queue = QueueModel::create("history_tree", delay);
+      int min_delay = ctrl_pkt_len / bandwidth + (ctrl_pkt_len % bandwidth != 0);
+      bus_queue = QueueModel::create("history_tree", min_delay);
       pthread_mutex_init(&mutex, NULL);
     }
 
@@ -73,8 +74,10 @@ uint64_t Bus::access(uint64_t timer, bool is_data)
     }
 
     int pkt_len = is_data ? data_pkt_len : ctrl_pkt_len;
+    int delay = pkt_len / bandwidth + (pkt_len % bandwidth != 0);
+
     pthread_mutex_lock(&mutex);
-    uint64_t contention_delay = bus_queue->computeQueueDelay(timer, pkt_len*delay); 
+    uint64_t contention_delay = bus_queue->computeQueueDelay(timer, delay); 
     pthread_mutex_unlock(&mutex);
     return contention_delay;
 }

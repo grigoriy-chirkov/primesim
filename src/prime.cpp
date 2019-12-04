@@ -188,9 +188,9 @@ int main(int argc, char *argv[])
     }
 
     if( !xml_parser.parse(argv[1]) ) {
-		cerr<< "XML file parse error!\n";
+        cerr<< "XML file parse error!\n";
         MPI_Abort(MPI_COMM_WORLD, -1);
-		return -1;
+        return -1;
     }
     xml_sim = xml_parser.getXmlSim();
     max_msg_size = xml_sim->max_msg_size;

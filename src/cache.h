@@ -58,7 +58,8 @@ typedef enum State
     E     =   2, //exclusive
     M     =   3, //modified
     V     =   4, //valid 
-    B     =   5  //broadcast
+    B     =   5, //broadcast
+    MS    =   6
 } State;
 
 typedef enum CacheType

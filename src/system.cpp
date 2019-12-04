@@ -41,12 +41,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "system.h"
 #include "common.h"
 
-
-
-
 void System::init(XmlSys* xml_sys_in)
 {
-    int i,j;
     xml_sys = xml_sys_in;
     sys_type = xml_sys->sys_type;
     protocol_type = xml_sys->protocol_type;
@@ -60,18 +56,18 @@ void System::init(XmlSys* xml_sys_in)
     verbose_report = xml_sys->verbose_report;
     total_bus_contention = 0;
     total_num_broadcast = 0;
-    max_num_sharers = xml_sys->max_num_sharers;
+
     directory_cache = NULL;
     tlb_cache = NULL;
 
     hit_flag = new bool [num_cores];
     delay = new int [num_cores];
-    for (i=0; i<num_cores; i++) {
+    for (int i = 0; i < num_cores; i++) {
         hit_flag[i] = false;
         delay[i] = 0;
     }
     cache_level = new CacheLevel [num_levels];
-    for (i=0; i<num_levels; i++) {
+    for (int i = 0; i < num_levels; i++) {
         cache_level[i].level = xml_sys->cache[i].level;
         cache_level[i].share = xml_sys->cache[i].share;
         cache_level[i].num_caches = (int)ceil((double)num_cores / cache_level[i].share);
@@ -85,15 +81,15 @@ void System::init(XmlSys* xml_sys_in)
         cache_level[i].lock_time = 0;
     }
     cache = new Cache** [num_levels];
-    for (i=0; i<num_levels; i++) {
+    for (int i = 0; i < num_levels; i++) {
         cache[i] = new Cache* [cache_level[i].num_caches];
-        for (j=0; j<cache_level[i].num_caches; j++) {
+        for (int j = 0; j < cache_level[i].num_caches; j++) {
             cache[i][j] = NULL;
         }
     }
 
     bus = new Bus*[num_levels];
-    for (i=0; i<num_levels; i++) {
+    for (int i = 0; i < num_levels; i++) {
         bus[i] = NULL;
     }
     directory_cache_bus = NULL;
@@ -101,46 +97,46 @@ void System::init(XmlSys* xml_sys_in)
 
     network.init(cache_level[num_levels-1].num_caches, &(xml_sys->network));
     home_stat = new int [network.getNumNodes()];
-    for (i=0; i<network.getNumNodes(); i++) {
+    for (int i = 0; i < network.getNumNodes(); i++) {
         home_stat[i] = 0;
     }
     if (xml_sys->directory_cache.size > 0) {
         directory_cache = new Cache* [network.getNumNodes()];
-        for (i = 0; i < network.getNumNodes(); i++) {
+        for (int i = 0; i < network.getNumNodes(); i++) {
             directory_cache[i] = NULL;
         }
     }
 
     if (tlb_enable && xml_sys->tlb_cache.size > 0) {
         tlb_cache = new Cache [num_cores];
-        for (i = 0; i < num_cores; i++) {
+        for (int i = 0; i < num_cores; i++) {
             tlb_cache[i].init(&(xml_sys->tlb_cache), NULL, TLB_CACHE, page_size, 0, i);
         }
     }
 
     cache_lock = new pthread_mutex_t* [num_levels];
-    for (i=0; i<num_levels; i++) {
+    for (int i = 0; i < num_levels; i++) {
         cache_lock[i] = new pthread_mutex_t [cache_level[i].num_caches];
-        for (j=0; j<cache_level[i].num_caches; j++) {
+        for (int j = 0; j < cache_level[i].num_caches; j++) {
             pthread_mutex_init(&cache_lock[i][j], NULL);
         }
     }
 
     directory_cache_lock = new pthread_mutex_t [network.getNumNodes()];
-    for (i = 0; i < network.getNumNodes(); i++) {
+    for (int i = 0; i < network.getNumNodes(); i++) {
         pthread_mutex_init(&directory_cache_lock[i], NULL);
     }
 
     cache_init_done = new bool* [num_levels];
-    for (i=0; i<num_levels; i++) {
+    for (int i = 0; i < num_levels; i++) {
         cache_init_done[i] = new bool [cache_level[i].num_caches];
-        for (j=0; j<cache_level[i].num_caches; j++) {
+        for (int j = 0; j < cache_level[i].num_caches; j++) {
             cache_init_done[i][j] = false;
         }
     }   
 
     directory_cache_init_done = new bool [network.getNumNodes()];
-    for (i = 0; i < network.getNumNodes(); i++) {
+    for (int i = 0; i < network.getNumNodes(); i++) {
         directory_cache_init_done[i] = false;
     }
 
@@ -151,7 +147,6 @@ void System::init(XmlSys* xml_sys_in)
 // This function models an access to memory system and returns the delay.
 int System::access(int core_id, InsMem* ins_mem, int64_t timer)
 {
-    int cache_id;
     if (core_id >= num_cores) {
         cerr << "Error: Not enough cores!\n";
         return -1;
@@ -159,7 +154,7 @@ int System::access(int core_id, InsMem* ins_mem, int64_t timer)
 
     hit_flag[core_id] = false;
     delay[core_id] = 0;
-    cache_id = core_id / cache_level[0].share;
+    int cache_id = core_id / cache_level[0].share;
  
     if (tlb_enable) {
         delay[core_id] = tlb_translate(ins_mem, core_id, timer);
@@ -183,7 +178,6 @@ int System::access(int core_id, InsMem* ins_mem, int64_t timer)
 //Initialize caches on demand
 Cache* System::init_caches(int level, int cache_id)
 {
-    int k;
     pthread_mutex_lock(&cache_lock[level][cache_id]);
     if (cache[level][cache_id] == NULL) {
         cache[level][cache_id] = new Cache();
@@ -199,7 +193,7 @@ Cache* System::init_caches(int level, int cache_id)
         else {
             cache[level][cache_id]->num_children = cache_level[level].share/cache_level[level-1].share;
             cache[level][cache_id]->child = new Cache* [cache[level][cache_id]->num_children];
-            for (k=0; k<cache[level][cache_id]->num_children; k++) {
+            for (int k = 0; k < cache[level][cache_id]->num_children; k++) {
                 cache[level][cache_id]->child[k] = cache[level-1][cache_id*cache[level][cache_id]->num_children+k];
             }
         }
@@ -213,7 +207,7 @@ Cache* System::init_caches(int level, int cache_id)
         }
     }
     else {
-        for (k=0; k<cache[level][cache_id]->num_children; k++) {
+        for (int k = 0; k < cache[level][cache_id]->num_children; k++) {
             cache[level][cache_id]->child[k] = cache[level-1][cache_id*cache[level][cache_id]->num_children+k];
         }
     }
@@ -243,17 +237,11 @@ void System::init_directories(int home_id)
 // MESI coherence protocol
 char System::mesi_bus(Cache* cache_cur, int level, int cache_id, int core_id, InsMem* ins_mem, int64_t timer)
 {
-    int i, shared_line;
-    int delay_bus;
-    Line*  line_cur;
-    Line*  line_temp;
-    InsMem ins_mem_old;
-    
     if (!cache_init_done[level][cache_id]) {
         cache_cur = init_caches(level, cache_id); 
     }
     if (cache_cur->bus != NULL) {
-        delay_bus = cache_cur->bus->access(timer+delay[core_id], false);
+        int delay_bus = cache_cur->bus->access(timer+delay[core_id], false);
         total_bus_contention += delay_bus;
         delay[core_id] += delay_bus;
     }
@@ -263,43 +251,42 @@ char System::mesi_bus(Cache* cache_cur, int level, int cache_id, int core_id, In
     }
 
     cache_cur->lockUp(ins_mem);
-    line_cur = cache_cur->accessLine(ins_mem);
+    Line* line_cur = cache_cur->accessLine(ins_mem);
     //Cache hit
     if (line_cur != NULL) {
         line_cur->timestamp = timer+delay[core_id];
         hit_flag[core_id] = true; 
         //Write
         if (ins_mem->mem_type == WR) {
-           if (level != num_levels-1) {
-               if (line_cur->state != M) {
-                   line_cur->state = I;
-                   line_cur->state = mesi_bus(cache_cur->parent, level+1, 
-                                          cache_id*cache_level[level].share/cache_level[level+1].share, 
-                                          core_id, ins_mem, timer+delay[core_id]);
-               }
-           }
-           else {
-               if (line_cur->state == S) {
-                   shared_line = 0;
-                   for (i=0; i < cache_level[num_levels-1].num_caches; i++) {
-                       if (i != cache_id) {
-                           if (!cache_init_done[num_levels-1][i]) {
-                               init_caches(num_levels-1, i);
-                           }
-                           line_temp = cache[num_levels-1][i]->accessLine(ins_mem);
-                           if(line_temp != NULL) {
-                               shared_line = 1;
+            if (level != num_levels-1) {
+                if (line_cur->state != M) {
+                    line_cur->state = I;
+                    int parent_cache_id = cache_id*cache_level[level].share/cache_level[level+1].share;
+                    line_cur->state = mesi_bus(cache_cur->parent, level+1, parent_cache_id, 
+                                            core_id, ins_mem, timer+delay[core_id]);
+                }
+            }
+            else {
+                if (line_cur->state == S) {
+                    for (int i = 0; i < cache_level[num_levels-1].num_caches; i++) {
+                        if (i != cache_id) {
+                            if (!cache_init_done[num_levels-1][i]) {
+                                continue;
+                                //init_caches(num_levels-1, i);
+                            }
+                            Line* line_temp = cache[num_levels-1][i]->accessLine(ins_mem);
+                            if(line_temp != NULL) {
                                line_temp->state = I;
                                inval_children(cache[num_levels-1][i], ins_mem);
-                           }
-                       }
-                   }
-               }
-               line_cur->state = M;
-           }
-           inval_children(cache_cur, ins_mem);
-           cache_cur->unlockUp(ins_mem);
-           return M;
+                            }
+                        }
+                    }
+                }
+                line_cur->state = M;
+            }
+            inval_children(cache_cur, ins_mem);
+            cache_cur->unlockUp(ins_mem);
+            return M;
         }
         //Read
         else {
@@ -314,28 +301,28 @@ char System::mesi_bus(Cache* cache_cur, int level, int cache_id, int core_id, In
     else
     {
         //Evict old line
+        InsMem ins_mem_old;
         line_cur = cache_cur->replaceLine(&ins_mem_old, ins_mem);
         if (line_cur->state) {
             inval_children(cache_cur, &ins_mem_old);
         }
         line_cur->timestamp = timer+delay[core_id];
         if (level != num_levels-1) {
-            line_cur->state = mesi_bus(cache_cur->parent, level+1, 
-                                   cache_id*cache_level[level].share/cache_level[level+1].share, core_id, 
-                                   ins_mem, timer+delay[core_id]);
+            int parent_cache_id = cache_id*cache_level[level].share/cache_level[level+1].share;
+            line_cur->state = mesi_bus(cache_cur->parent, level+1, parent_cache_id, 
+                                   core_id, ins_mem, timer+delay[core_id]);
         }
         else {
             //Write miss
             if (ins_mem->mem_type == WR) {
-                shared_line = 0;
-                for (i=0; i < cache_level[num_levels-1].num_caches; i++) {
+                for (int i = 0; i < cache_level[num_levels-1].num_caches; i++) {
                     if (i != cache_id) {
                         if (!cache_init_done[num_levels-1][i]) {
-                            init_caches(num_levels-1, i);
+                            continue;
+                            //init_caches(num_levels-1, i);
                         }
-                        line_temp = cache[num_levels-1][i]->accessLine(ins_mem);
+                        Line* line_temp = cache[num_levels-1][i]->accessLine(ins_mem);
                         if (line_temp != NULL) {
-                            shared_line = 1;
                             inval_children(cache[num_levels-1][i], ins_mem);
                             if (line_temp->state == M || line_temp->state == E) {
                                 line_temp->state = I;
@@ -346,40 +333,41 @@ char System::mesi_bus(Cache* cache_cur, int level, int cache_id, int core_id, In
                             }
                          }
                     }
-                 }
-                 line_cur->state = M;
-             }   
-             //Read miss
-             else {
-                 shared_line = 0;
-                 for (i=0; i < cache_level[num_levels-1].num_caches; i++) {
+                }
+                line_cur->state = M;
+            }   
+            //Read miss
+            else {
+                bool shared_line = false;
+                for (int i = 0; i < cache_level[num_levels-1].num_caches; i++) {
                     if (i != cache_id) {
-                         if (!cache_init_done[num_levels-1][i]) {
-                             init_caches(num_levels-1, i);
-                         } 
-                         line_temp = cache[num_levels-1][i]->accessLine(ins_mem);
-                         if(line_temp != NULL)
-                         {
-                             shared_line = 1;
-                             share_children(cache[num_levels-1][i], ins_mem);
-                             if (line_temp->state == M || line_temp->state == E) {
-                                 line_temp->state = S;
-                                 break;
-                             }
-                             else {
-                                 line_temp->state = S;
-                             }
-                         }
+                        if (!cache_init_done[num_levels-1][i]) {
+                            continue;
+                            //init_caches(num_levels-1, i);
+                        } 
+                        Line* line_temp = cache[num_levels-1][i]->accessLine(ins_mem);
+                        if(line_temp != NULL)
+                        {
+                            shared_line = true;
+                            share_children(cache[num_levels-1][i], ins_mem);
+                            if (line_temp->state == M || line_temp->state == E) {
+                                line_temp->state = S;
+                                break;
+                            }
+                            else {
+                                line_temp->state = S;
+                            }
+                        }
                     }
-                 }
-                 if (shared_line) {
-                     line_cur->state = S;
-                 }
-                 else {
-                     line_cur->state = E;
-                 }
-             }
-             delay[core_id] += dram.access(ins_mem);                    
+                }
+                if (shared_line) {
+                    line_cur->state = S;
+                }
+                else {
+                    line_cur->state = E;
+                }
+            }
+            delay[core_id] += dram.access(ins_mem);                    
         }  
         cache_cur->incMissCount();        
         cache_cur->unlockUp(ins_mem);
@@ -392,21 +380,12 @@ char System::mesi_bus(Cache* cache_cur, int level, int cache_id, int core_id, In
 // write-update coherence protocol
 char System::write_update_bus(Cache* cache_cur, int level, int cache_id, int core_id, InsMem* ins_mem, int64_t timer)
 {
-    int i, shared_line;
-    int delay_bus;
-    Line*  line_cur;
-    Line*  line_temp;
-    InsMem ins_mem_old;
-    
     if (!cache_init_done[level][cache_id]) {
         cache_cur = init_caches(level, cache_id); 
     }
     if (cache_cur->bus != NULL) {
-        bool is_write = false;
-        if (ins_mem->mem_type == WR) {
-            is_write = true;
-        } 
-        delay_bus = cache_cur->bus->access(timer+delay[core_id], is_write);
+        bool is_write = (ins_mem->mem_type == WR);
+        int delay_bus = cache_cur->bus->access(timer+delay[core_id], is_write);
         total_bus_contention += delay_bus;
         delay[core_id] += delay_bus;
     }
@@ -416,119 +395,125 @@ char System::write_update_bus(Cache* cache_cur, int level, int cache_id, int cor
     }
 
     cache_cur->lockUp(ins_mem);
-    line_cur = cache_cur->accessLine(ins_mem);
+    Line* line_cur = cache_cur->accessLine(ins_mem);
     //Cache hit
     if (line_cur != NULL) {
         line_cur->timestamp = timer+delay[core_id];
         hit_flag[core_id] = true; 
         //Write
         if (ins_mem->mem_type == WR) {
-           if (level != num_levels-1) {
-               if (line_cur->state != M) {
-                   line_cur->state = I;
-                   line_cur->state = write_update_bus(cache_cur->parent, level+1, 
-                                          cache_id*cache_level[level].share/cache_level[level+1].share, 
+            if (level != num_levels-1) {
+                if (line_cur->state != M && line_cur->state != MS) {
+                    int parent_cache_id = cache_id*cache_level[level].share/cache_level[level+1].share;
+                    line_cur->state = write_update_bus(cache_cur->parent, level+1, parent_cache_id, 
                                           core_id, ins_mem, timer+delay[core_id]);
-               }
-           }
-           else {
-               if (line_cur->state == S || line_cur->state == M) {
-                   for (i=0; i < cache_level[num_levels-1].num_caches; i++) {
-                       if (i != cache_id) {
-                           if (!cache_init_done[num_levels-1][i]) {
-                               init_caches(num_levels-1, i);
-                           }
-                           line_temp = cache[num_levels-1][i]->accessLine(ins_mem);
-                           if(line_temp != NULL) {
-                               line_temp->state = M;
-                               modify_children(cache[num_levels-1][i], ins_mem);
-                           }
-                       }
-                   }
-               }
-               line_cur->state = M;
-           }
-           modify_children(cache_cur, ins_mem);
-           cache_cur->unlockUp(ins_mem);
-           return M;
-        }
-        //Read
-        else {
-            if (line_cur->state != S && line_cur->state != M) { 
-                share_children(cache_cur, ins_mem);
+                }
             }
-            cache_cur->unlockUp(ins_mem);
-            return line_cur->state; 
+            else {
+                if (line_cur->state == S) {
+                    for (int i = 0; i < cache_level[num_levels-1].num_caches; i++) {
+                        if (i != cache_id) {
+                            if (!cache_init_done[num_levels-1][i]) {
+                               continue;
+                               //init_caches(num_levels-1, i);
+                            }
+                            Line* line_temp = cache[num_levels-1][i]->accessLine(ins_mem);
+                            if(line_temp != NULL) {
+                               line_temp->state = MS;
+                               modify_children(cache[num_levels-1][i], ins_mem, /*shared*/ true);
+                            }
+                        }
+                    }
+                    line_cur->state = MS;
+                } 
+                else if (line_cur->state != MS) {
+                    line_cur->state = M;
+                }
+            }
+            modify_children(cache_cur, ins_mem, /*shared*/ line_cur->state == MS);
         }
+
+        cache_cur->unlockUp(ins_mem);
+        return line_cur->state;
     }
+
     //Cache miss
     else
     {
         //Evict old line
+        InsMem ins_mem_old;
         line_cur = cache_cur->replaceLine(&ins_mem_old, ins_mem);
         if (line_cur->state) {
             inval_children(cache_cur, &ins_mem_old);
         }
         line_cur->timestamp = timer+delay[core_id];
         if (level != num_levels-1) {
-            line_cur->state = write_update_bus(cache_cur->parent, level+1, 
-                                   cache_id*cache_level[level].share/cache_level[level+1].share, core_id, 
-                                   ins_mem, timer+delay[core_id]);
+            int parent_cache_id = cache_id*cache_level[level].share/cache_level[level+1].share;
+            line_cur->state = write_update_bus(cache_cur->parent, level+1, parent_cache_id, 
+                                   core_id, ins_mem, timer+delay[core_id]);
         }
         else {
             //Write miss
             if (ins_mem->mem_type == WR) {
-                for (i=0; i < cache_level[num_levels-1].num_caches; i++) {
+                bool shared_line = false;  
+                for (int i = 0; i < cache_level[num_levels-1].num_caches; i++) {
                     if (i != cache_id) {
                         if (!cache_init_done[num_levels-1][i]) {
-                            init_caches(num_levels-1, i);
+                            continue;
+                            //init_caches(num_levels-1, i);
                         }
-                        line_temp = cache[num_levels-1][i]->accessLine(ins_mem);
+                        Line* line_temp = cache[num_levels-1][i]->accessLine(ins_mem);
                         if (line_temp != NULL) {
-                            modify_children(cache[num_levels-1][i], ins_mem);
-                            if (line_temp->state == E) {
-                                line_temp->state = M;
+                            shared_line = true;
+                            modify_children(cache[num_levels-1][i], ins_mem, /*shared*/ true);
+                            if (line_temp->state == E || line_temp->state == M) {
+                                line_temp->state = MS;
                                 break;
                             }
                             else {
-                                line_temp->state = M;
+                                line_temp->state = MS;
                             }
-                         }
+                        }
                     }
-                 }
-                 line_cur->state = M;
-             }   
-             //Read miss
-             else {
-                 shared_line = 0;
-                 for (i=0; i < cache_level[num_levels-1].num_caches; i++) {
+                }
+                if (shared_line) {
+                    line_cur->state = MS;
+                } else {
+                    line_cur->state = M;
+                }
+            }   
+            //Read miss
+            else {
+                bool shared_line = false;
+                for (int i = 0; i < cache_level[num_levels-1].num_caches; i++) {
                     if (i != cache_id) {
-                         if (!cache_init_done[num_levels-1][i]) {
-                             init_caches(num_levels-1, i);
-                         } 
-                         line_temp = cache[num_levels-1][i]->accessLine(ins_mem);
-                         if(line_temp != NULL)
-                         {
-                             shared_line = 1;
-                             share_children(cache[num_levels-1][i], ins_mem);
-                             if (line_temp->state == E) {
-                                 line_temp->state = S;
-                                 break;
-                             }
-                             else {
-                                 line_temp->state = S;
-                             }
-                         }
+                        if (!cache_init_done[num_levels-1][i]) {
+                            continue;
+                            init_caches(num_levels-1, i);
+                        } 
+                        Line* line_temp = cache[num_levels-1][i]->accessLine(ins_mem);
+                        if(line_temp != NULL)
+                        {
+                            shared_line = true;
+                            share_children(cache[num_levels-1][i], ins_mem);
+                            if (line_temp->state == E || line_temp->state == M) {
+                                line_temp->state = S;
+                                break;
+                            }
+                            else {
+                                line_temp->state = S;
+                            }
+                        }
                     }
-                 }
-                 if (shared_line) {
-                     line_cur->state = S;
-                 }
-                 else {
-                     line_cur->state = E;
-                 }
-             }
-             delay[core_id] += dram.access(ins_mem);                    
+                }
+                if (shared_line) {
+                    line_cur->state = S;
+                }
+                else {
+                    line_cur->state = E;
+                }
+            }
+            delay[core_id] += dram.access(ins_mem);                    
         }  
         cache_cur->incMissCount();        
         cache_cur->unlockUp(ins_mem);
@@ -652,22 +637,19 @@ char System::mesi_directory(Cache* cache_cur, int level, int cache_id, int core_
 }
 
 
-
 // This function propagates down shared state
 
 int System::share(Cache* cache_cur, InsMem* ins_mem)
 {
-    int i, delay = 0, delay_tmp = 0, delay_max = 0;
-    Line*  line_cur;
-
+    int delay = 0, delay_max = 0;
     if (cache_cur != NULL) {
         cache_cur->lockDown(ins_mem);
-        line_cur = cache_cur->accessLine(ins_mem);
+        Line* line_cur = cache_cur->accessLine(ins_mem);
         delay += cache_cur->getAccessTime();
         if (line_cur != NULL && (line_cur->state == M || line_cur->state == E)) {
             line_cur->state = S;
-            for (i=0; i<cache_cur->num_children; i++) {
-                delay_tmp = share(cache_cur->child[i], ins_mem);
+            for (int i = 0; i < cache_cur->num_children; i++) {
+                int delay_tmp = share(cache_cur->child[i], ins_mem);
                 if (delay_tmp > delay_max) {
                     delay_max = delay_tmp;
                 }
@@ -683,11 +665,10 @@ int System::share(Cache* cache_cur, InsMem* ins_mem)
 
 int System::share_children(Cache* cache_cur, InsMem* ins_mem)
 {
-    int i, delay = 0, delay_tmp = 0, delay_max = 0;
-
+    int delay = 0, delay_max = 0;
     if (cache_cur != NULL) {
-        for (i=0; i<cache_cur->num_children; i++) {
-            delay_tmp = share(cache_cur->child[i], ins_mem);
+        for (int i = 0; i < cache_cur->num_children; i++) {
+            int delay_tmp = share(cache_cur->child[i], ins_mem);
             if (delay_tmp > delay_max) {
                 delay_max = delay_tmp;
             }
@@ -702,42 +683,15 @@ int System::share_children(Cache* cache_cur, InsMem* ins_mem)
 // This function propagates down invalidate state
 int System::inval(Cache* cache_cur, InsMem* ins_mem)
 {
-    int i, delay = 0, delay_tmp = 0, delay_max = 0;
-    Line* line_cur;
-
+    int delay = 0, delay_max = 0;
     if (cache_cur != NULL) {
         cache_cur->lockDown(ins_mem);
-        line_cur = cache_cur->accessLine(ins_mem);
+        Line* line_cur = cache_cur->accessLine(ins_mem);
         delay += cache_cur->getAccessTime();
         if (line_cur != NULL) {
             line_cur->state = I;
-            for (i=0; i<cache_cur->num_children; i++) {
-                delay_tmp = inval(cache_cur->child[i], ins_mem);
-                if (delay_tmp > delay_max) {
-                    delay_max = delay_tmp;
-                }
-            }
-            delay += delay_max;
-        }
-        cache_cur->unlockDown(ins_mem);
-    }
-    return delay;
-}
-
-// This function propagates down modified state
-int System::modify(Cache* cache_cur, InsMem* ins_mem)
-{
-    int i, delay = 0, delay_tmp = 0, delay_max = 0;
-    Line* line_cur;
-
-    if (cache_cur != NULL) {
-        cache_cur->lockDown(ins_mem);
-        line_cur = cache_cur->accessLine(ins_mem);
-        delay += cache_cur->getAccessTime();
-        if (line_cur != NULL) {
-            line_cur->state = M;
-            for (i=0; i<cache_cur->num_children; i++) {
-                delay_tmp = modify(cache_cur->child[i], ins_mem);
+            for (int i = 0; i < cache_cur->num_children; i++) {
+                int delay_tmp = inval(cache_cur->child[i], ins_mem);
                 if (delay_tmp > delay_max) {
                     delay_max = delay_tmp;
                 }
@@ -752,28 +706,53 @@ int System::modify(Cache* cache_cur, InsMem* ins_mem)
 // This function propagates down invalidate state starting from children nodes
 int System::inval_children(Cache* cache_cur, InsMem* ins_mem)
 {
-    int i, delay = 0, delay_tmp = 0, delay_max = 0;
-
+    int delay = 0, delay_max = 0;
     if (cache_cur != NULL) {
-        for (i=0; i<cache_cur->num_children; i++) {
-            delay_tmp = inval(cache_cur->child[i], ins_mem);
+        for (int i = 0; i < cache_cur->num_children; i++) {
+            int delay_tmp = inval(cache_cur->child[i], ins_mem);
             if (delay_tmp > delay_max) {
                 delay_max = delay_tmp;
             }
         }
         delay += delay_max;
+    }
+    return delay;
+}
+
+// This function propagates down modified state
+int System::modify(Cache* cache_cur, InsMem* ins_mem, bool shared)
+{
+    int delay = 0, delay_max = 0;
+    if (cache_cur != NULL) {
+        cache_cur->lockDown(ins_mem);
+        Line* line_cur = cache_cur->accessLine(ins_mem);
+        delay += cache_cur->getAccessTime();
+        if (line_cur != NULL) {
+            if (shared) {
+                line_cur->state = MS;
+            } else {
+                line_cur->state = M;
+            }
+            for (int i = 0; i < cache_cur->num_children; i++) {
+                int delay_tmp = modify(cache_cur->child[i], ins_mem, shared);
+                if (delay_tmp > delay_max) {
+                    delay_max = delay_tmp;
+                }
+            }
+            delay += delay_max;
+        }
+        cache_cur->unlockDown(ins_mem);
     }
     return delay;
 }
 
 // This function propagates down update state starting from children nodes
-int System::modify_children(Cache* cache_cur, InsMem* ins_mem)
+int System::modify_children(Cache* cache_cur, InsMem* ins_mem, bool shared)
 {
-    int i, delay = 0, delay_tmp = 0, delay_max = 0;
-
+    int delay = 0, delay_max = 0; 
     if (cache_cur != NULL) {
-        for (i=0; i<cache_cur->num_children; i++) {
-            delay_tmp = modify(cache_cur->child[i], ins_mem);
+        for (int i = 0; i < cache_cur->num_children; i++) {
+            int delay_tmp = modify(cache_cur->child[i], ins_mem, shared);
             if (delay_tmp > delay_max) {
                 delay_max = delay_tmp;
             }
@@ -782,8 +761,6 @@ int System::modify_children(Cache* cache_cur, InsMem* ins_mem)
     }
     return delay;
 }
-
-
 
 //Access inclusive directory cache without backup directory
 int System::accessDirectoryCache(int cache_id, int home_id, InsMem* ins_mem, int64_t timer, char* state)
@@ -829,22 +806,6 @@ int System::accessDirectoryCache(int cache_id, int home_id, InsMem* ins_mem, int
                 }
                 delay += delay_max;
             }   
-            //Broadcast
-            else if (line_cur->state == B) {
-                total_num_broadcast++;
-                for (int i = 0; i < num_cores; i++) { 
-                    delay_temp = delay_pipe;
-                    delay_temp += network.transmit(home_id, i, 0, timer+delay+delay_temp);
-                    delay_temp += inval(cache[num_levels-1][i], &ins_mem_old);
-                    delay_temp += network.transmit(i, home_id, 0, timer+delay+delay_temp);
-                    if (delay_temp > delay_max) {
-                        delay_max = delay_temp;
-                    }
-                    delay_pipe += network.getHeaderFlits();
-                }
-                delay += delay_max;
-            } 
-
         }
         if (ins_mem->mem_type == WR) {
             line_cur->state = M;
@@ -883,21 +844,6 @@ int System::accessDirectoryCache(int cache_id, int home_id, InsMem* ins_mem, int
                 delay += delay_max;
                 delay += dram.access(ins_mem);
             }
-            else if (line_cur->state == B) {
-                total_num_broadcast++;
-                for (int i = 0; i < num_cores; i++) { 
-                    delay_temp = delay_pipe;
-                    delay_temp += network.transmit(home_id, i, 0, timer+delay+delay_temp);
-                    delay_temp += inval(cache[num_levels-1][i], ins_mem);
-                    delay_temp += network.transmit(i, home_id, 0, timer+delay+delay_temp);
-                    if (delay_temp > delay_max) {
-                        delay_max = delay_temp;
-                    }
-                    delay_pipe += network.getHeaderFlits();
-                }
-                delay += delay_max;
-                delay += dram.access(ins_mem);
-            } 
             line_cur->state = M;
             line_cur->sharer_set.clear();
             line_cur->sharer_set.insert(cache_id);
@@ -911,17 +857,7 @@ int System::accessDirectoryCache(int cache_id, int home_id, InsMem* ins_mem, int
             }
             else if (line_cur->state == S) {
                 delay += dram.access(ins_mem);
-                if ((protocol_type == LIMITED_PTR) && ((int)line_cur->sharer_set.size() >= max_num_sharers)) {
-                    line_cur->state = B;
-                }
-                else {
-                    line_cur->state = S;
-                }
-
-            } 
-            else if (line_cur->state == B) {
-                delay += dram.access(ins_mem);
-                line_cur->state = B;
+                line_cur->state = S;
             } 
             line_cur->sharer_set.insert(cache_id);
         } 
@@ -931,12 +867,7 @@ int System::accessDirectoryCache(int cache_id, int home_id, InsMem* ins_mem, int
             dram.access(ins_mem);
         }
     }
-    if(line_cur->state == B) {
-        (*state) = S;
-    }
-    else {
-        (*state) = line_cur->state;
-    }
+    (*state) = line_cur->state;
     line_cur->timestamp = timer;
     directory_cache[home_id]->unlockUp(ins_mem);
     return delay;
@@ -990,21 +921,6 @@ int System::accessSharedCache(int cache_id, int home_id, InsMem* ins_mem, int64_
                 }
                 delay += delay_max;
             }
-            //Broadcast
-            else if (line_cur->state == B) {
-                total_num_broadcast++;
-                for(int i = 0; i < num_cores; i++) { 
-                    delay_temp = delay_pipe;
-                    delay_temp += network.transmit(home_id, i, 0, timer+delay+delay_temp);
-                    delay_temp += inval(cache[num_levels-1][i], &ins_mem_old);
-                    delay_temp += network.transmit(i, home_id, 0, timer+delay+delay_temp);
-                    if (delay_temp > delay_max) {
-                        delay_max = delay_temp;
-                    }
-                    delay_pipe += network.getHeaderFlits();
-                }
-                delay += delay_max;
-            } 
         }
         if(ins_mem->mem_type == WR) {
             line_cur->state = M;
@@ -1042,21 +958,6 @@ int System::accessSharedCache(int cache_id, int home_id, InsMem* ins_mem, int64_
                 }
                 delay += delay_max;
             }
-            else if (line_cur->state == B) {
-                total_num_broadcast++;
-                for(int i = 0; i < num_cores; i++) { 
-                    delay_temp = delay_pipe;
-                    delay_temp += network.transmit(home_id, i, 0, timer+delay+delay_temp);
-                    delay_temp += inval(cache[num_levels-1][i], ins_mem);
-                    delay_temp += network.transmit(i, home_id, 0, timer+delay+delay_temp);
-                    if(delay_temp > delay_max) 
-                    {
-                        delay_max = delay_temp;
-                    }
-                    delay_pipe += network.getHeaderFlits();
-                }
-                delay += delay_max;
-            } 
             else if(line_cur->state == V) {
             }
             line_cur->state = M;
@@ -1071,15 +972,7 @@ int System::accessSharedCache(int cache_id, int home_id, InsMem* ins_mem, int64_
                 line_cur->state = S;
             }
             else if (line_cur->state == S) {
-                if ((protocol_type == LIMITED_PTR) && ((int)line_cur->sharer_set.size() >= max_num_sharers)) {
-                    line_cur->state = B;
-                }
-                else {
-                    line_cur->state = S;
-                }
-            } 
-            else if (line_cur->state == B) {
-                line_cur->state = B;
+                line_cur->state = S;
             } 
             else if (line_cur->state == V) {
                 line_cur->state = E;
@@ -1093,12 +986,8 @@ int System::accessSharedCache(int cache_id, int home_id, InsMem* ins_mem, int64_
             dram.access(ins_mem);
         }
     }
-    if (line_cur->state == B) {
-        (*state) = S;
-    }
-    else {
-        (*state) = line_cur->state;
-    }
+    
+    (*state) = line_cur->state;
     line_cur->timestamp = timer;
     directory_cache[home_id]->unlockUp(ins_mem);
     return delay;
@@ -1109,12 +998,11 @@ int System::accessSharedCache(int cache_id, int home_id, InsMem* ins_mem, int64_
 int System::tlb_translate(InsMem *ins_mem, int core_id, int64_t timer)
 {
     int delay = 0;
-    Line* line_cur;
-    InsMem ins_mem_old;
-    line_cur = tlb_cache[core_id].accessLine(ins_mem);
+    Line* line_cur = tlb_cache[core_id].accessLine(ins_mem);
     tlb_cache[core_id].incInsCount();
     delay += tlb_cache[core_id].getAccessTime();
     if (line_cur == NULL) {
+        InsMem ins_mem_old;
         line_cur = tlb_cache[core_id].replaceLine(&ins_mem_old, ins_mem);
         if (line_cur->state) {
             tlb_cache[core_id].incEvictCount();
@@ -1132,13 +1020,10 @@ int System::tlb_translate(InsMem *ins_mem, int core_id, int64_t timer)
 // Home allocation uses low-order bits interleaving
 int System::allocHomeId(int num_homes, uint64_t addr)
 {
-    int offset;
-    int home_bits;
-    int home_mask;
     //Home bits
-    offset = (int) log2(xml_sys->directory_cache.block_size );
-    home_mask = (int)ceil(log2(num_homes));
-    home_bits = (int)(((addr >> offset)) % (1 << home_mask));
+    int offset = (int) log2(xml_sys->directory_cache.block_size );
+    int home_mask = (int)ceil(log2(num_homes));
+    int home_bits = (int)(((addr >> offset)) % (1 << home_mask));
     if (home_bits < num_homes) {
         return home_bits;
     }   
@@ -1149,8 +1034,7 @@ int System::allocHomeId(int num_homes, uint64_t addr)
 
 int System::getHomeId(InsMem *ins_mem)
 {
-    int home_id;
-    home_id = allocHomeId(network.getNumNodes(), ins_mem->addr_dmem);
+    int home_id = allocHomeId(network.getNumNodes(), ins_mem->addr_dmem);
     if (home_id < 0) {
         cerr<<"Error: Wrong home id\n";
     }
@@ -1167,7 +1051,6 @@ int System::getCoreCount()
 
 void System::report(ofstream* result)
 {
-    int i, j;
     uint64_t ins_count = 0, miss_count = 0, evict_count = 0, wb_count = 0;
     double miss_rate = 0;
    
@@ -1229,13 +1112,13 @@ void System::report(ofstream* result)
     *result << "Total delay caused by bus contention: " << total_bus_contention <<" cycles\n";
     *result << "Total # of broadcast: " << total_num_broadcast <<"\n\n";
 
-    for (i=0; i<num_levels; i++) {
+    for (int i = 0; i < num_levels; i++) {
         ins_count =0;   
         miss_count = 0;
         evict_count = 0;
         wb_count = 0;
         miss_rate = 0;
-        for (j=0; j<cache_level[i].num_caches; j++) {
+        for (int j = 0; j < cache_level[i].num_caches; j++) {
             if (cache[i][j] != NULL) {
                 ins_count += cache[i][j]->getInsCount();
                 miss_count += cache[i][j]->getMissCount();
@@ -1283,9 +1166,9 @@ void System::report(ofstream* result)
 
     if (verbose_report) {
         *result << "Statistics for each cache with non-zero accesses: \n\n";
-        for (i=0; i<num_levels; i++) {
+        for (int i = 0; i < num_levels; i++) {
             *result << "LEVEL"<<i<<"*****************************************************\n\n";
-            for (j=0; j<cache_level[i].num_caches; j++) {
+            for (int j = 0; j < cache_level[i].num_caches; j++) {
                 if (cache[i][j] != NULL) {
                     if (cache[i][j]->getInsCount() > 0) {
                         *result << "The " <<j<<"th cache:\n";
@@ -1324,9 +1207,8 @@ void System::report(ofstream* result)
 
 System::~System()
 {
-        int i, j;
-        for (i=0; i<num_levels; i++) {
-            for (j=0; j<cache_level[i].num_caches; j++) {
+        for (int i = 0; i < num_levels; i++) {
+            for (int j = 0; j < cache_level[i].num_caches; j++) {
                 if (cache[i][j] != NULL) {
                     if (i != 0) {
                         delete [] cache[i][j]->child;
@@ -1336,7 +1218,7 @@ System::~System()
             }
         }
 
-        for (i=0; i<num_levels; i++) {
+        for (int i = 0; i < num_levels; i++) {
             if (bus[i] != NULL) {
                 delete bus[i];
             }
@@ -1346,12 +1228,12 @@ System::~System()
             delete directory_cache_bus;
         }
 
-        for (i=0; i<num_levels; i++) {
+        for (int i = 0; i < num_levels; i++) {
             delete [] cache[i];
             delete [] cache_lock[i];
             delete [] cache_init_done[i];
         }
-        for (i = 0; i < network.getNumNodes(); i++) {
+        for (int i = 0; i < network.getNumNodes(); i++) {
             if (directory_cache[i] != NULL) {
                 delete directory_cache[i];
             }

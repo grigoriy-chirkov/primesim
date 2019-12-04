@@ -74,17 +74,15 @@ network = {
             'inject_delay' : 1
 }
 
-# Mesi bus configuration
-# Note: all latencies are counted in cycles
-
+# bus configuration
 bus = {
-            # bus delay
-            'delay'     : 2,
+            # bandwidth in bytes/clk
+            'bandwidth'     : 8,
             # unlimited bus bandwidth, 0->false, 1->true
             'unlim_bw'   : 1,
-            #
-            'data_pkt_len' : 1,
-            'ctrl_pkt_len' : 1
+            # length of messages in bytes
+            'data_pkt_len' : 64+24,  # one cache line + 3 controling flits, each 8 bytes
+            'ctrl_pkt_len' : 24 # 3 controling flits, each 8 bytes
 }
 
 # data cache hierarchies
@@ -143,7 +141,7 @@ system = {
             # avarage CPI for non-memory instructions, can be tuned to simulate different types of cores
             'cpi_nonmem' : 1,
             # core count
-            'num_cores' : 1024,
+            'num_cores' : 256,
             # 0 -> directory based, 1-> bus based
             'sys_type' : 1,
             # 0 -> full map, 1 -> limited pointer

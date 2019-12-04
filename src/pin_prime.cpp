@@ -155,7 +155,7 @@ void Trace(TRACE trace, void *v)
         BBL_InsertCall(bbl, IPOINT_BEFORE, (AFUNPTR)execNonMem, IARG_FAST_ANALYSIS_CALL, 
                        IARG_UINT32, nonmem_count, IARG_THREAD_ID, IARG_END);
 
-	} // End Ins For
+    } // End Ins For
 
 }
 
@@ -228,9 +228,9 @@ int main(int argc, char *argv[])
     XmlSim*   xml_sim;
 
     if(!xml_parser.parse(KnobConfigFile.Value().c_str())) {
-		cerr<< "XML file parse error!\n";
+        cerr<< "XML file parse error!\n";
         MPI_Abort(MPI_COMM_WORLD, -1);
-		return -1;
+        return -1;
     }
     xml_sim = xml_parser.getXmlSim();
 
@@ -247,8 +247,8 @@ int main(int argc, char *argv[])
 
     PIN_AddSyscallEntryFunction(SyscallEntry, 0);
     PIN_AddSyscallExitFunction(SyscallExit, 0);
-    PIN_AddThreadStartFunction(ThreadStart, 0);	
-    PIN_AddThreadFiniFunction(ThreadFini, 0);	
+    PIN_AddThreadStartFunction(ThreadStart, 0); 
+    PIN_AddThreadFiniFunction(ThreadFini, 0);   
     PIN_AddApplicationStartFunction(Start, 0);
     PIN_AddFiniFunction(Fini, 0);
 

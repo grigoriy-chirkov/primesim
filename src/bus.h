@@ -46,9 +46,9 @@ class Bus
         uint64_t access(uint64_t timer, bool is_data);
     private:
         bool unlim_bw;
-        uint64_t delay;
         uint64_t data_pkt_len;
         uint64_t ctrl_pkt_len;
+        uint64_t bandwidth;
         pthread_mutex_t mutex;
         QueueModel *bus_queue;
 };

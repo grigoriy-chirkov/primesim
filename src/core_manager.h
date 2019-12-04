@@ -131,9 +131,9 @@ class CoreManager
         int syscall_count;
         int sync_syscall_count;
         int max_msg_size;
-        uint32_t thread_sync_interval;
-        uint32_t proc_sync_interval;
-        uint32_t syscall_cost;
+        uint64_t thread_sync_interval;
+        uint64_t proc_sync_interval;
+        uint64_t syscall_cost;
         int num_recv_threads;
         PIN_LOCK thread_lock;
         PIN_MUTEX mutex;

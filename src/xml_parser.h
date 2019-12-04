@@ -67,7 +67,7 @@ typedef struct XmlNetwork
 
 typedef struct XmlBus
 {
-    int delay;
+    int bandwidth;
     bool unlim_bw;
     int ctrl_pkt_len;
     int data_pkt_len;

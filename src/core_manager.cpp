@@ -30,6 +30,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 #include <iostream>
+#include <limits>
+#include <iomanip>
 #include <fstream>
 #include <sstream>
 #include <string>
@@ -405,14 +407,16 @@ void CoreManager::getSimFinishTime()
 
 void CoreManager::report(ofstream *result)
 {
-    uint64_t total_cycles = 0, total_ins_counts = 0,  total_nonmem_ins_counts = 0;
+    double total_cycles = 0, total_ins_counts = 0,  total_nonmem_ins_counts = 0;
     double total_cycles_nonmem = 0;
-    total_cycles = (uint64_t)(cycle[0]._count);
+    total_cycles = (cycle[0]._count);
     int i;
+    *result << fixed << std::setprecision(1);
     for (i = 0; i < max_threads; i++) {
+    //    total_cycles += cycle[i]._count;
         total_ins_counts += ins_count[i]._count;
-        total_nonmem_ins_counts += (uint64_t)ins_nonmem[i]._count;
-        cout << "[PriME] Thread " <<i<< " runs " << (uint64_t)ins_count[i]._count <<" instructions\n";
+        total_nonmem_ins_counts += ins_nonmem[i]._count;
+        cout << "[PriME] Thread " <<i<< " runs " << ins_count[i]._count <<" instructions\n";
     }
     total_cycles_nonmem = total_nonmem_ins_counts * cpi_nonmem;
     sim_time = (sim_finish_time.tv_sec - sim_start_time.tv_sec) + (double) (sim_finish_time.tv_nsec - sim_start_time.tv_nsec) / 1000000000.0; 
@@ -427,19 +431,19 @@ void CoreManager::report(ofstream *result)
     *result << "System frequence = "<< freq <<" GHz\n";
     *result << "Simulation runs " << total_cycles <<" cycles\n";
     for(i = 0; i < max_threads; i++) {
-        *result << "Thread " <<i<< " runs " << (uint64_t)cycle[i]._count <<" cycles\n";
-        *result << "Thread " <<i<< " runs " << (uint64_t)ins_count[i]._count <<" instructions\n";
+        *result << "Thread " <<i<< " runs " << cycle[i]._count <<" cycles\n";
+        *result << "Thread " <<i<< " runs " << ins_count[i]._count <<" instructions\n";
     }
     *result << "Simulation runs " << total_ins_counts <<" instructions\n\n";
     *result << "Simulation result:\n\n";
-    *result << "The average IPC / core = "<< (double)total_ins_counts / total_cycles << "\n";
+    *result << "The average IPC = "<< total_ins_counts / total_cycles << "\n";
     *result << "Total memory instructions: "<< total_ins_counts - total_nonmem_ins_counts <<endl;
-    *result << "Total memory access cycles: "<< (uint64_t)(total_cycles - total_cycles_nonmem) <<endl;
+    *result << "Total memory access cycles: "<< (total_cycles - total_cycles_nonmem) <<endl;
     *result << "Total non-memory instructions: "<< total_nonmem_ins_counts <<endl;
-    *result << "Total non-memory access cycles: "<< (uint64_t)(total_cycles_nonmem) <<endl;
+    *result << "Total non-memory access cycles: "<< (total_cycles_nonmem) <<endl;
     *result << "System call count : " << syscall_count <<endl;
     *result << "Sync System call count : " << sync_syscall_count <<endl;
-
+    *result << scientific;
 }
 
 void CoreManager::finishSim(int32_t code, void *v)

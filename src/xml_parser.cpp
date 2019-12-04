@@ -84,7 +84,7 @@ XmlParser::XmlParser()
     xml_sim.sys.network.router_delay = 0;
     xml_sim.sys.network.link_delay = 0;
 
-    xml_sim.sys.bus.delay = 0;
+    xml_sim.sys.bus.bandwidth = 0;
     xml_sim.sys.bus.unlim_bw = false;
     xml_sim.sys.bus.data_pkt_len = 0;
     xml_sim.sys.bus.ctrl_pkt_len = 0;
@@ -100,39 +100,39 @@ XmlSim* XmlParser::getXmlSim()
 //Get the xml pointer of a xml file
 bool XmlParser::getDoc (const char *docname) 
 {
-	doc = xmlParseFile(docname);
-	
-	if (doc == NULL ) {
-		cerr << "Document not parsed successfully. \n";
-		return false;
-	}
+    doc = xmlParseFile(docname);
+    
+    if (doc == NULL ) {
+        cerr << "Document not parsed successfully. \n";
+        return false;
+    }
 
-	return true;
+    return true;
 }
 
 //Get the node set of a xml file
 xmlXPathObjectPtr XmlParser::getNodeSet (xmlChar *xpath)
 {
-	xmlXPathContextPtr context;
-	xmlXPathObjectPtr result;
+    xmlXPathContextPtr context;
+    xmlXPathObjectPtr result;
 
-	context = xmlXPathNewContext(doc);
-	if (context == NULL) {
-		cerr << "Error in xmlXPathNewContext\n";
-		return NULL;
-	}
-	result = xmlXPathEvalExpression(xpath, context);
-	xmlXPathFreeContext(context);
-	if (result == NULL) {
-		cerr << "Error in xmlXPathEvalExpression\n";
-		return NULL;
-	}
-	if (xmlXPathNodeSetIsEmpty(result->nodesetval)) {
-		xmlXPathFreeObject(result);
+    context = xmlXPathNewContext(doc);
+    if (context == NULL) {
+        cerr << "Error in xmlXPathNewContext\n";
+        return NULL;
+    }
+    result = xmlXPathEvalExpression(xpath, context);
+    xmlXPathFreeContext(context);
+    if (result == NULL) {
+        cerr << "Error in xmlXPathEvalExpression\n";
+        return NULL;
+    }
+    if (xmlXPathNodeSetIsEmpty(result->nodesetval)) {
+        xmlXPathFreeObject(result);
         cerr << "No result\n";
-		return NULL;
-	}
-	return result;
+        return NULL;
+    }
+    return result;
 }
 
 
@@ -152,55 +152,55 @@ bool XmlParser::parseSim()
     int        i, item_count = 0;
     for (i = 0; i < sim_node->nodesetval->nodeNr; i++) {
         cur = sim_node->nodesetval->nodeTab[i]->xmlChildrenNode;
-	    while (cur != NULL) {
+        while (cur != NULL) {
             if ((!xmlStrcmp(cur->name, (const xmlChar *)"max_msg_size"))) {
-		        key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
+                key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
                 convert.clear();
                 convert.str("");
-		        convert << key;
+                convert << key;
                 convert >> dec >> xml_sim.max_msg_size;
                 xmlFree(key);
                 item_count++;
- 	        }
+            }
             if ((!xmlStrcmp(cur->name, (const xmlChar *)"num_recv_threads"))) {
-		        key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
+                key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
                 convert.clear();
                 convert.str("");
-		        convert << key;
+                convert << key;
                 convert >> dec >> xml_sim.num_recv_threads;
                 xmlFree(key);
                 item_count++;
- 	        }
+            }
             if ((!xmlStrcmp(cur->name, (const xmlChar *)"thread_sync_interval"))) {
-		        key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
+                key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
                 convert.clear();
                 convert.str("");
-		        convert << key;
+                convert << key;
                 convert >> dec >> xml_sim.thread_sync_interval;
                 xmlFree(key);
                 item_count++;
- 	        }
+            }
             if ((!xmlStrcmp(cur->name, (const xmlChar *)"proc_sync_interval"))) {
-		        key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
+                key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
                 convert.clear();
                 convert.str("");
-		        convert << key;
+                convert << key;
                 convert >> dec >> xml_sim.proc_sync_interval;
                 xmlFree(key);
                 item_count++;
- 	        }
+            }
             if ((!xmlStrcmp(cur->name, (const xmlChar *)"syscall_cost"))) {
-		        key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
+                key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
                 convert.clear();
                 convert.str("");
-		        convert << key;
+                convert << key;
                 convert >> dec >> xml_sim.syscall_cost;
                 xmlFree(key);
                 item_count++;
- 	        }
-	    cur = cur->next;
+            }
+        cur = cur->next;
         }
-	}
+    }
     xmlXPathFreeObject(sim_node);
     //Check if # of items is corret
     return (item_count == 5);
@@ -224,25 +224,25 @@ bool XmlParser::parseSys()
     int        i, item_count = 0;
     for (i = 0; i < sys_node->nodesetval->nodeNr; i++) {
         cur = sys_node->nodesetval->nodeTab[i]->xmlChildrenNode;
-	    while (cur != NULL) {
-	        if ((!xmlStrcmp(cur->name, (const xmlChar *)"sys_type"))) {
-		        key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
+        while (cur != NULL) {
+            if ((!xmlStrcmp(cur->name, (const xmlChar *)"sys_type"))) {
+                key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
                 convert.clear();
                 convert.str("");
-		        convert << key;
+                convert << key;
                 convert >> dec >> xml_sim.sys.sys_type;
                 xmlFree(key);
                 item_count++;
- 	        }
-	        if ((!xmlStrcmp(cur->name, (const xmlChar *)"protocol_type"))) {
-		        key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
+            }
+            if ((!xmlStrcmp(cur->name, (const xmlChar *)"protocol_type"))) {
+                key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
                 convert.clear();
                 convert.str("");
-		        convert << key;
+                convert << key;
                 convert >> dec >> xml_sim.sys.protocol_type;
                 xmlFree(key);
                 item_count++;
- 	        }
+            }
             if ((!xmlStrcmp(cur->name, (const xmlChar *)"protocol"))) {
                 key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
                 convert.clear();
@@ -252,110 +252,110 @@ bool XmlParser::parseSys()
                 xmlFree(key);
                 item_count++;
             }
-	        if ((!xmlStrcmp(cur->name, (const xmlChar *)"max_num_sharers"))) {
-		        key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
+            if ((!xmlStrcmp(cur->name, (const xmlChar *)"max_num_sharers"))) {
+                key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
                 convert.clear();
                 convert.str("");
-		        convert << key;
+                convert << key;
                 convert >> dec >> xml_sim.sys.max_num_sharers;
                 xmlFree(key);
                 //optional item is not checked
                 //item_count++;
- 	        }
-	        if ((!xmlStrcmp(cur->name, (const xmlChar *)"page_size"))) {
-		        key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
+            }
+            if ((!xmlStrcmp(cur->name, (const xmlChar *)"page_size"))) {
+                key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
                 convert.clear();
                 convert.str("");
-		        convert << key;
+                convert << key;
                 convert >> dec >> xml_sim.sys.page_size;
                 xmlFree(key);
                 item_count++;
- 	        }
-	        if ((!xmlStrcmp(cur->name, (const xmlChar *)"tlb_enable"))) {
-		        key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
+            }
+            if ((!xmlStrcmp(cur->name, (const xmlChar *)"tlb_enable"))) {
+                key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
                 convert.clear();
                 convert.str("");
-		        convert << key;
+                convert << key;
                 convert >> dec >> xml_sim.sys.tlb_enable;
                 xmlFree(key);
                 item_count++;
- 	        }
-	        if ((!xmlStrcmp(cur->name, (const xmlChar *)"shared_llc"))) {
-		        key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
+            }
+            if ((!xmlStrcmp(cur->name, (const xmlChar *)"shared_llc"))) {
+                key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
                 convert.clear();
                 convert.str("");
-		        convert << key;
+                convert << key;
                 convert >> dec >> xml_sim.sys.shared_llc;
                 xmlFree(key);
                 item_count++;
- 	        }
-	        if ((!xmlStrcmp(cur->name, (const xmlChar *)"verbose_report"))) {
-		        key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
+            }
+            if ((!xmlStrcmp(cur->name, (const xmlChar *)"verbose_report"))) {
+                key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
                 convert.clear();
                 convert.str("");
-		        convert << key;
+                convert << key;
                 convert >> dec >> xml_sim.sys.verbose_report;
                 xmlFree(key);
                 item_count++;
- 	        }
+            }
             if ((!xmlStrcmp(cur->name, (const xmlChar *)"cpi_nonmem"))) {
-		        key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
+                key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
                 convert.clear();
                 convert.str("");
-		        convert << key;
+                convert << key;
                 convert >> xml_sim.sys.cpi_nonmem;
                 xmlFree(key);
                 item_count++;
- 	        }
+            }
             if ((!xmlStrcmp(cur->name, (const xmlChar *)"dram_access_time"))) {
-		        key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
+                key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
                 convert.clear();
                 convert.str("");
-		        convert << key;
+                convert << key;
                 convert >> dec >> xml_sim.sys.dram_access_time;
                 xmlFree(key);
                 item_count++;
- 	        }
+            }
             if ((!xmlStrcmp(cur->name, (const xmlChar *)"num_levels"))) {
-		        key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
+                key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
                 convert.clear();
                 convert.str("");
-		        convert << key;
+                convert << key;
                 convert >> dec >> xml_sim.sys.num_levels;
                 xmlFree(key);
                 item_count++;
- 	        }
+            }
             if ((!xmlStrcmp(cur->name, (const xmlChar *)"num_cores"))) {
-		        key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
+                key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
                 convert.clear();
                 convert.str("");
-		        convert << key;
+                convert << key;
                 convert >> dec >> xml_sim.sys.num_cores;
                 xmlFree(key);
                 item_count++;
- 	        }
+            }
             if ((!xmlStrcmp(cur->name, (const xmlChar *)"page_miss_delay"))) {
-		        key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
+                key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
                 convert.clear();
                 convert.str("");
-		        convert << key;
+                convert << key;
                 convert >> dec >> xml_sim.sys.page_miss_delay;
                 xmlFree(key);
                 item_count++;
- 	        }
+            }
 
             if ((!xmlStrcmp(cur->name, (const xmlChar *)"freq"))) {
-		        key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
+                key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
                 convert.clear();
                 convert.str("");
-		        convert << key;
+                convert << key;
                 convert >> xml_sim.sys.freq;
                 xmlFree(key);
                 item_count++;
- 	        }
-	    cur = cur->next;
+            }
+        cur = cur->next;
         }
-	}
+    }
     xml_sim.sys.cache = new XmlCache [xml_sim.sys.num_levels]; 
     xmlXPathFreeObject(sys_node);
     return (item_count == 13);
@@ -379,64 +379,64 @@ bool XmlParser::parseNetwork()
     int        i, item_count = 0;
     for (i = 0; i < net_node->nodesetval->nodeNr; i++) {
         cur = net_node->nodesetval->nodeTab[i]->xmlChildrenNode;
-	    while (cur != NULL) {
-	        if ((!xmlStrcmp(cur->name, (const xmlChar *)"net_type"))) {
-		        key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
+        while (cur != NULL) {
+            if ((!xmlStrcmp(cur->name, (const xmlChar *)"net_type"))) {
+                key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
                 convert.clear();
                 convert.str("");
-		        convert << key;
+                convert << key;
                 convert >> dec >> xml_sim.sys.network.net_type;
                 xmlFree(key);
                 //item_count++;
- 	        }
-	        if ((!xmlStrcmp(cur->name, (const xmlChar *)"data_width"))) {
-		        key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
+            }
+            if ((!xmlStrcmp(cur->name, (const xmlChar *)"data_width"))) {
+                key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
                 convert.clear();
                 convert.str("");
-		        convert << key;
+                convert << key;
                 convert >> dec >> xml_sim.sys.network.data_width;
                 xmlFree(key);
                 item_count++;
- 	        }
+            }
             if ((!xmlStrcmp(cur->name, (const xmlChar *)"header_flits"))) {
-		        key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
+                key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
                 convert.clear();
                 convert.str("");
-		        convert << key;
+                convert << key;
                 convert >> dec >> xml_sim.sys.network.header_flits;
                 xmlFree(key);
                 item_count++;
- 	        }
+            }
             if ((!xmlStrcmp(cur->name, (const xmlChar *)"router_delay"))) {
-		        key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
+                key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
                 convert.clear();
                 convert.str("");
-		        convert << key;
+                convert << key;
                 convert >> dec >> xml_sim.sys.network.router_delay;
                 xmlFree(key);
                 item_count++;
- 	        }
+            }
             if ((!xmlStrcmp(cur->name, (const xmlChar *)"link_delay"))) {
-		        key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
+                key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
                 convert.clear();
                 convert.str("");
-		        convert << key;
+                convert << key;
                 convert >> dec >> xml_sim.sys.network.link_delay;
                 xmlFree(key);
                 item_count++;
- 	        }
+            }
             if ((!xmlStrcmp(cur->name, (const xmlChar *)"inject_delay"))) {
-		        key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
+                key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
                 convert.clear();
                 convert.str("");
-		        convert << key;
+                convert << key;
                 convert >> dec >> xml_sim.sys.network.inject_delay;
                 xmlFree(key);
                 //item_count++;
- 	        }
- 	    cur = cur->next;
+            }
+        cur = cur->next;
         }
-	}
+    }
     xmlXPathFreeObject(net_node);
     return (item_count == 4);
 }
@@ -461,12 +461,12 @@ bool XmlParser::parseBus()
     for (i = 0; i < bus_node->nodesetval->nodeNr; i++) {
         cur = bus_node->nodesetval->nodeTab[i]->xmlChildrenNode;
         while (cur != NULL) {
-            if ((!xmlStrcmp(cur->name, (const xmlChar *)"delay"))) {
+            if ((!xmlStrcmp(cur->name, (const xmlChar *)"bandwidth"))) {
                 key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
                 convert.clear();
                 convert.str("");
                 convert << key;
-                convert >> dec >> xml_sim.sys.bus.delay;
+                convert >> dec >> xml_sim.sys.bus.bandwidth;
                 xmlFree(key);
                 item_count++;
             }
@@ -524,64 +524,64 @@ bool XmlParser::parseDirectoryCache()
     int        i, item_count = 0;
     for (i = 0; i < cache_node->nodesetval->nodeNr; i++) {
         cur = cache_node->nodesetval->nodeTab[i]->xmlChildrenNode;
-	    while (cur != NULL) {
-	        if ((!xmlStrcmp(cur->name, (const xmlChar *)"level"))) {
-		        key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
+        while (cur != NULL) {
+            if ((!xmlStrcmp(cur->name, (const xmlChar *)"level"))) {
+                key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
                 convert.clear();
                 convert.str("");
-		        convert << key;
+                convert << key;
                 convert >> dec >> xml_sim.sys.directory_cache.level;
                 xmlFree(key);
                 item_count++;
- 	        }
+            }
             if ((!xmlStrcmp(cur->name, (const xmlChar *)"share"))) {
-		        key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
+                key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
                 convert.clear();
                 convert.str("");
-		        convert << key;
+                convert << key;
                 convert >> dec >> xml_sim.sys.directory_cache.share;
                 xmlFree(key);
                 item_count++;
- 	        }
+            }
             if ((!xmlStrcmp(cur->name, (const xmlChar *)"access_time"))) {
-		        key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
+                key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
                 convert.clear();
                 convert.str("");
-		        convert << key;
+                convert << key;
                 convert >> dec >> xml_sim.sys.directory_cache.access_time;
                 xmlFree(key);
                 item_count++;
- 	        }
+            }
             if ((!xmlStrcmp(cur->name, (const xmlChar *)"size"))) {
-		        key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
+                key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
                 convert.clear();
                 convert.str("");
-		        convert << key;
+                convert << key;
                 convert >> dec >> xml_sim.sys.directory_cache.size;
                 xmlFree(key);
                 item_count++;
- 	        }
+            }
             if ((!xmlStrcmp(cur->name, (const xmlChar *)"block_size"))) {
-		        key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
+                key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
                 convert.clear();
                 convert.str("");
-		        convert << key;
+                convert << key;
                 convert >> dec >> xml_sim.sys.directory_cache.block_size;
                 xmlFree(key);
                 item_count++;
- 	        }
+            }
             if ((!xmlStrcmp(cur->name, (const xmlChar *)"num_ways"))) {
-		        key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
+                key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
                 convert.clear();
                 convert.str("");
-		        convert << key;
+                convert << key;
                 convert >> dec >> xml_sim.sys.directory_cache.num_ways;
                 xmlFree(key);
                 item_count++;
- 	        }
- 	    cur = cur->next;
+            }
+        cur = cur->next;
         }
-	}
+    }
     xmlXPathFreeObject(cache_node);
     return (item_count == 6);
 }
@@ -604,64 +604,64 @@ bool XmlParser::parseTlbCache()
     int        i, item_count = 0;
     for (i = 0; i < cache_node->nodesetval->nodeNr; i++) {
         cur = cache_node->nodesetval->nodeTab[i]->xmlChildrenNode;
-	    while (cur != NULL) {
-	        if ((!xmlStrcmp(cur->name, (const xmlChar *)"level"))) {
-		        key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
+        while (cur != NULL) {
+            if ((!xmlStrcmp(cur->name, (const xmlChar *)"level"))) {
+                key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
                 convert.clear();
                 convert.str("");
-		        convert << key;
+                convert << key;
                 convert >> dec >> xml_sim.sys.tlb_cache.level;
                 xmlFree(key);
                 item_count++;
- 	        }
+            }
             if ((!xmlStrcmp(cur->name, (const xmlChar *)"share"))) {
-		        key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
+                key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
                 convert.clear();
                 convert.str("");
-		        convert << key;
+                convert << key;
                 convert >> dec >> xml_sim.sys.tlb_cache.share;
                 xmlFree(key);
                 item_count++;
- 	        }
+            }
             if ((!xmlStrcmp(cur->name, (const xmlChar *)"access_time"))) {
-		        key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
+                key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
                 convert.clear();
                 convert.str("");
-		        convert << key;
+                convert << key;
                 convert >> dec >> xml_sim.sys.tlb_cache.access_time;
                 xmlFree(key);
                 item_count++;
- 	        }
+            }
             if ((!xmlStrcmp(cur->name, (const xmlChar *)"size"))) {
-		        key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
+                key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
                 convert.clear();
                 convert.str("");
-		        convert << key;
+                convert << key;
                 convert >> dec >> xml_sim.sys.tlb_cache.size;
                 xmlFree(key);
                 item_count++;
- 	        }
+            }
             if ((!xmlStrcmp(cur->name, (const xmlChar *)"block_size"))) {
-		        key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
+                key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
                 convert.clear();
                 convert.str("");
-		        convert << key;
+                convert << key;
                 convert >> dec >> xml_sim.sys.tlb_cache.block_size;
                 xmlFree(key);
                 item_count++;
- 	        }
+            }
             if ((!xmlStrcmp(cur->name, (const xmlChar *)"num_ways"))) {
-		        key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
+                key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
                 convert.clear();
                 convert.str("");
-		        convert << key;
+                convert << key;
                 convert >> dec >> xml_sim.sys.tlb_cache.num_ways;
                 xmlFree(key);
                 item_count++;
- 	        }
- 	    cur = cur->next;
+            }
+        cur = cur->next;
         }
-	}
+    }
     xmlXPathFreeObject(cache_node);
     return (item_count == 6);
 }
@@ -685,64 +685,64 @@ bool XmlParser::parseCache()
     int        i, item_count = 0;
     for (i = 0; i < cache_node->nodesetval->nodeNr; i++) {
         cur = cache_node->nodesetval->nodeTab[i]->xmlChildrenNode;
-	    while (cur != NULL) {
-	        if ((!xmlStrcmp(cur->name, (const xmlChar *)"level"))) {
-		        key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
+        while (cur != NULL) {
+            if ((!xmlStrcmp(cur->name, (const xmlChar *)"level"))) {
+                key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
                 convert.clear();
                 convert.str("");
-		        convert << key;
+                convert << key;
                 convert >> dec >> xml_sim.sys.cache[i].level;
                 xmlFree(key);
                 item_count++;
- 	        }
+            }
             if ((!xmlStrcmp(cur->name, (const xmlChar *)"share"))) {
-		        key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
+                key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
                 convert.clear();
                 convert.str("");
-		        convert << key;
+                convert << key;
                 convert >> dec >> xml_sim.sys.cache[i].share;
                 xmlFree(key);
                 item_count++;
- 	        }
+            }
             if ((!xmlStrcmp(cur->name, (const xmlChar *)"access_time"))) {
-		        key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
+                key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
                 convert.clear();
                 convert.str("");
-		        convert << key;
+                convert << key;
                 convert >> dec >> xml_sim.sys.cache[i].access_time;
                 xmlFree(key);
                 item_count++;
- 	        }
+            }
             if ((!xmlStrcmp(cur->name, (const xmlChar *)"size"))) {
-		        key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
+                key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
                 convert.clear();
                 convert.str("");
-		        convert << key;
+                convert << key;
                 convert >> dec >> xml_sim.sys.cache[i].size;
                 xmlFree(key);
                 item_count++;
- 	        }
+            }
             if ((!xmlStrcmp(cur->name, (const xmlChar *)"block_size"))) {
-		        key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
+                key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
                 convert.clear();
                 convert.str("");
-		        convert << key;
+                convert << key;
                 convert >> dec >> xml_sim.sys.cache[i].block_size;
                 xmlFree(key);
                 item_count++;
- 	        }
+            }
             if ((!xmlStrcmp(cur->name, (const xmlChar *)"num_ways"))) {
-		        key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
+                key = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
                 convert.clear();
                 convert.str("");
-		        convert << key;
+                convert << key;
                 convert >> dec >> xml_sim.sys.cache[i].num_ways;
                 xmlFree(key);
                 item_count++;
- 	        }
-	    cur = cur->next;
+            }
+        cur = cur->next;
         }
-	}
+    }
     xmlXPathFreeObject(cache_node);
     return (item_count == 6 * xml_sim.sys.num_levels);
 }

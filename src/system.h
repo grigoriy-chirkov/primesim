@@ -97,8 +97,8 @@ class System
         int share_children(Cache* cache_cur, InsMem* ins_mem);
         int inval(Cache* cache_cur, InsMem* ins_mem);
         int inval_children(Cache* cache_cur, InsMem* ins_mem);
-        int modify(Cache* cache_cur, InsMem* ins_mem);
-        int modify_children(Cache* cache_cur, InsMem* ins_mem);
+        int modify(Cache* cache_cur, InsMem* ins_mem, bool shared = false);
+        int modify_children(Cache* cache_cur, InsMem* ins_mem, bool shared = false);
         int accessDirectoryCache(int cache_id, int home_id, InsMem* ins_mem, int64_t timer, char* state);
         int accessSharedCache(int cache_id, int home_id, InsMem* ins_mem, int64_t timer, char* state);
         int allocHomeId(int num_homes, uint64_t addr);
@@ -122,7 +122,7 @@ class System
         bool       *hit_flag;
         int*       delay;
         int        total_num_broadcast;
-        uint64_t   total_bus_contention;
+        double     total_bus_contention;
         int*       home_stat;
         XmlSys*    xml_sys;
         CacheLevel* cache_level;
