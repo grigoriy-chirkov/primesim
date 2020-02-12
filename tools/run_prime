@@ -63,7 +63,7 @@ def run_prime(config_path, output_path, progs):
         f.write('source env.sh\n')
 
     config_path_prime = os.path.splitext(config_path)[0] + "_prime.xml"
-    f.write('mpiexec --verbose -np 1 --bind-to none '
+    f.write('mpiexec --verbose -np 1 --bind-to none  '
             +prime_path+'/bin/prime ' + config_path_prime + ' ' +output_path)
 
     config_path_pin = os.path.splitext(config_path)[0] + "_pin.xml"
