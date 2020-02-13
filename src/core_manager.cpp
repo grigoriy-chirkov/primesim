@@ -111,20 +111,7 @@ void CoreManager::barrier(THREADID threadid)
     {
         //Send out all remaining memory requests in the buffer
         if (mpi_pos[threadid] > 1) {
-            msg_mem[threadid][0].mem_type = 0;
-            msg_mem[threadid][0].addr_dmem = mpi_pos[threadid];
-            msg_mem[threadid][0].mem_size = threadid;
-            msg_mem[threadid][0].message_type = MEM_REQUESTS;
-            MPI_Send(msg_mem[threadid], mpi_pos[threadid] * sizeof(MsgMem), MPI_CHAR, 0, core[threadid], MPI_COMM_WORLD);
-            MPI_Recv(&delay[threadid], 1, MPI_INT, 0, threadid, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-
-            if (delay[threadid] == -1) {
-                cerr<<"An error occurs in cache system\n";
-                MPI_Abort(MPI_COMM_WORLD, -1);
-                PIN_ExitApplication(-1);
-            }
-            cycle[threadid]._count += delay[threadid];
-            mpi_pos[threadid] = 1;
+            drainMemReqs(threadid);
         }
 
         PIN_MutexLock(&mutex);
@@ -236,7 +223,6 @@ void CoreManager::execNonMem(uint32_t ins_count_in, THREADID threadid)
 // Handle a memory instruction
 void CoreManager::execMem(void * addr, THREADID threadid, uint32_t size, BOOL mem_type)
 {
-
     delay[threadid] = 0;
     msg_mem[threadid][mpi_pos[threadid]].mem_type = mem_type;
     msg_mem[threadid][mpi_pos[threadid]].addr_dmem = (uint64_t) addr;
@@ -246,23 +232,27 @@ void CoreManager::execMem(void * addr, THREADID threadid, uint32_t size, BOOL me
     cycle[threadid]._count += 1;
     mpi_pos[threadid]++;
     if (mpi_pos[threadid] >= (max_msg_size + 1)) {
-        msg_mem[threadid][0].mem_type = 0;
-        msg_mem[threadid][0].addr_dmem = mpi_pos[threadid];
-        msg_mem[threadid][0].mem_size = threadid;
-        msg_mem[threadid][0].message_type = MEM_REQUESTS;
-        MPI_Send(msg_mem[threadid], mpi_pos[threadid] * sizeof(MsgMem), MPI_CHAR, 0, core[threadid], MPI_COMM_WORLD);
-
-        MPI_Recv(&delay[threadid], 1, MPI_INT, 0, threadid, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-
-        if(delay[threadid] == -1) {
-            cerr<<"An error occurs in cache system\n";
-            MPI_Abort(MPI_COMM_WORLD, -1);
-            PIN_ExitApplication(-1);
-        }
-        cycle[threadid]._count += delay[threadid];
-        mpi_pos[threadid] = 1;
+        drainMemReqs(threadid);
     }
     barrier(threadid);
+}
+
+void CoreManager::drainMemReqs(THREADID threadid) {
+    msg_mem[threadid][0].mem_type = 0;
+    msg_mem[threadid][0].addr_dmem = mpi_pos[threadid];
+    msg_mem[threadid][0].mem_size = threadid;
+    msg_mem[threadid][0].message_type = MEM_REQUESTS;
+    MPI_Send(msg_mem[threadid], mpi_pos[threadid] * sizeof(MsgMem), MPI_CHAR, 0, core[threadid], MPI_COMM_WORLD);
+
+    MPI_Recv(&delay[threadid], 1, MPI_INT, 0, threadid, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    //delay[threadid] = 1;
+    if(delay[threadid] == -1) {
+        cerr<<"An error occurs in cache system\n";
+        MPI_Abort(MPI_COMM_WORLD, -1);
+        PIN_ExitApplication(-1);
+    }
+    cycle[threadid]._count += delay[threadid];
+    mpi_pos[threadid] = 1;
 }
 
 // This routine is executed every time a thread starts.
@@ -305,21 +295,7 @@ void CoreManager::threadFini(THREADID threadid, const CONTEXT *ctxt, int32_t cod
 {
     //Send out all remaining memory requests in the buffer
     if(mpi_pos[threadid] > 1) {
-        msg_mem[threadid][0].mem_type = 0;
-        msg_mem[threadid][0].addr_dmem = mpi_pos[threadid];
-        msg_mem[threadid][0].mem_size = threadid;
-        msg_mem[threadid][0].message_type = MEM_REQUESTS;
-
-        MPI_Send(msg_mem[threadid], mpi_pos[threadid] * sizeof(MsgMem), MPI_CHAR, 0, core[threadid], MPI_COMM_WORLD);
-        MPI_Recv(&delay[threadid], 1, MPI_INT, 0, threadid, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-
-        if(delay[threadid] == -1) {
-            cerr<<"An error occurs in cache system\n";
-            MPI_Abort(MPI_COMM_WORLD, -1);
-            PIN_ExitApplication(-1);
-        }
-        cycle[threadid]._count += delay[threadid];
-        mpi_pos[threadid] = 1;
+        drainMemReqs(threadid);
     }
 
     PIN_GetLock(&thread_lock, threadid+1);
@@ -332,7 +308,6 @@ void CoreManager::threadFini(THREADID threadid, const CONTEXT *ctxt, int32_t cod
     msg_mem[threadid][0].message_type = THREAD_FINISHING;
 
     MPI_Send(&msg_mem[threadid][0], sizeof(MsgMem), MPI_CHAR, 0, core[threadid], MPI_COMM_WORLD);
-
 }
 
 
@@ -340,7 +315,6 @@ void CoreManager::threadFini(THREADID threadid, const CONTEXT *ctxt, int32_t cod
 void CoreManager::sysBefore(ADDRINT ip, ADDRINT num, ADDRINT arg0, ADDRINT arg1, ADDRINT arg2, 
                ADDRINT arg3, ADDRINT arg4, ADDRINT arg5, THREADID threadid)
 {
-
     if((num == SYS_futex &&  ((arg1&FUTEX_CMD_MASK) == FUTEX_WAIT || (arg1&FUTEX_CMD_MASK) == FUTEX_LOCK_PI))
     ||  num == SYS_wait4
     ||  num == SYS_waitid) {
