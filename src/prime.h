@@ -31,38 +31,20 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifndef PRIME_H
 #define PRIME_H
 
-#include <stdio.h>
-#include <assert.h>
-#include <iostream>
-#include <fstream>
-#include <sstream>
-#include <cmath>
-#include <string>
-#include <utility>
-#include <unistd.h>
-#include <map>
-#include <set>
-#include <vector>
-#include <pthread.h> 
-
-#include "mpi.h"
-#include "uncore_manager.h"
-#include "xml_parser.h"
 #include "common.h"
+#include "pthread.h"
 
-//////////////////////
-// GLOBAL VARIABLES //
-//////////////////////
 
-int myrank, numtasks;
-int max_msg_size;
-int num_threads = 0;
-MPI_Status status;          /* MPI receive routine parameter */
-list<int> prog_list;
-static unsigned int prog_count = 0;
-UncoreManager uncore_manager;
-ofstream result;
-pthread_mutex_t mutex;
+struct thread_buffer_t {
+    MPIMsg* msgs;
+    pthread_mutex_t mutex;
+    pthread_cond_t can_produce;
+    pthread_cond_t can_consume;
+};
+
+
+
+
 
 
 

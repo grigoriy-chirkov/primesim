@@ -52,7 +52,7 @@ class ThreadSched
         int deallocCore(int prog_id, int thread_id);
         int getCoreId(int prog_id, int thread_id);
         int getThreadCount(int prog_id);
-        void report(ofstream *result);
+        void report(ofstream& result);
         ~ThreadSched();        
     private:
         CoreMap core_map;

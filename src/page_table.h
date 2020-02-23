@@ -56,7 +56,7 @@ class PageTable
         uint64_t getPageId(uint64_t addr);
         uint64_t translate(InsMem* ins_mem);
         int getTransDelay();
-        void report(ofstream* result);
+        void report(ofstream& result);
         IntSet prog_set;
         ~PageTable();        
     private:

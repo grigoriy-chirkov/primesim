@@ -76,12 +76,12 @@ int PageTable::getTransDelay()
     return delay;
 }
 
-void PageTable::report(ofstream* result)
+void PageTable::report(ofstream& result)
 {
-    *result << "Page translation:\n";
-    *result << "Total # of pages: " << page_map.size() <<endl;
+    result << "Page translation:\n";
+    result << "Total # of pages: " << page_map.size() <<endl;
     for (PageMap::iterator pos_page_table = page_map.begin(); pos_page_table != page_map.end(); ++pos_page_table) {
-        *result <<dec<< "(proc ID: " << pos_page_table->first.first << " ,vpage Num: " <<hex<<pos_page_table->first.second << ") => "
+        result <<dec<< "(proc ID: " << pos_page_table->first.first << " ,vpage Num: " <<hex<<pos_page_table->first.second << ") => "
                 << "ppage Num: " << pos_page_table->second <<dec<< endl;
     }
 }

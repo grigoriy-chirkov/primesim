@@ -107,7 +107,7 @@ class Cache
         Cache*      parent;
         Cache**     child;
         Bus*        bus;
-        void init(XmlCache* xml_cache, Bus* bus_in, CacheType cache_type_in, int page_size_in, int level_in, int cache_id_in);
+        void init(const XmlCache* xml_cache, Bus* bus_in, CacheType cache_type_in, int page_size_in, int level_in, int cache_id_in);
         Line* accessLine(InsMem* ins_mem);
         Line* directAccess(int set, int way, InsMem* ins_mem);
         Line* replaceLine(InsMem* ins_mem_old, InsMem* ins_mem);
@@ -137,7 +137,7 @@ class Cache
         void addrParse(uint64_t addr_in, Addr* addr_out);
         void addrCompose(Addr* addr_in, uint64_t* addr_out);
         int lru(uint64_t index);
-        void report(ofstream* result);
+        void report(ofstream& result);
         ~Cache();
     private:
         int reverseBits(int num, int size);

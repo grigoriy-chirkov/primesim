@@ -102,17 +102,17 @@ int ThreadSched::getThreadCount(int prog_id)
 
 
 
-void ThreadSched::report(ofstream *result)
+void ThreadSched::report(ofstream& result)
 {
-    *result << "Core Allocation:\n";
+    result << "Core Allocation:\n";
 
     CoreMap::iterator pos = core_map.begin();
     for (pos = core_map.begin(); pos != core_map.end(); ++pos)
     {
-        *result << "(proc ID: " << pos->first.first << " ,thread ID: " <<pos->first.second << ") => "
+        result << "(proc ID: " << pos->first.first << " ,thread ID: " <<pos->first.second << ") => "
                << "core ID: " << pos->second << endl;
     }
-    *result<<endl;
+    result<<endl;
 
 }
 

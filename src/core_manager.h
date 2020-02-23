@@ -49,30 +49,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "mpi.h"
 #include "pin.H"
 #include "instlib.H"
-#include"xml_parser.h"
+#include "xml_parser.h"
 #include "common.h"
 
-
-
-// Force each thread's data to be in its own data cache line so that
-// multiple threads do not contend for the same data cache line.
-// This avoids the false sharing problem.
-class ThreadData
-{
-  public:
-    ThreadData() : _count(0) {}
-    double _count;
-    uint8_t _pad[PADSIZE];
-};
-
-enum ThreadState
-{
-    DEAD    = 0,
-    ACTIVE  = 1,
-    SUSPEND = 2,
-    FINISH  = 3,
-    WAIT    = 4
-};
+#define THREAD_MAX  1024 // Maximum number of threads in one process
 
 //For futex syscalls
 typedef struct SysFutex
@@ -86,49 +66,69 @@ typedef struct SysFutex
 
 class CoreManager
 {
+    struct ThreadData {
+        double cycle;
+        double ins_nonmem;
+        double ins_count;
+        MPIMsg   *msgs;
+        int delay;
+        int uncore_thread;
+        int mpi_pos;
+        int thread_state;
+        SysFutex sys_wake;
+        SysFutex sys_wait;
+        uint32_t  core_thread;
+
+        void init(int max_msg_size) {
+            msgs = new MPIMsg [max_msg_size + 1];
+            memset(msgs, 0, (max_msg_size + 1) * sizeof(MPIMsg));
+            thread_state = DEAD;
+            core_thread = -1;
+            uncore_thread = 0;
+            mpi_pos = 1;
+            memset(&sys_wake, 0, sizeof(sys_wake));
+            memset(&sys_wait, 0, sizeof(sys_wait));
+        };
+
+        ~ThreadData() {
+            delete[] msgs;
+        };
+    } __attribute__ ((aligned (64)));
+
     public:
-        void init(XmlSim* xml_sim, int num_procs_in, int rank_in);
+        void init(XmlSim* xml_sim, MPI_Comm _comm);
         void getSimStartTime();
         void getSimFinishTime();
-        void startSim(MPI_Comm *new_comm);
+        void startSim();
         void finishSim(int32_t code, void *v);
-        void insCount(uint32_t ins_count_in, THREADID threadid);
         void execNonMem(uint32_t ins_count_in, THREADID threadid);
         void execMem(void * addr, THREADID threadid, uint32_t size, bool mem_type);
         void threadStart(THREADID threadid, CONTEXT *ctxt, int32_t flags, void *v);
         void threadFini(THREADID threadid, const CONTEXT *ctxt, int32_t code, void *v);
+        void syscallEntry(THREADID threadIndex, CONTEXT *ctxt, SYSCALL_STANDARD std, void *v);
+        void syscallExit(THREADID threadIndex, CONTEXT *ctxt, SYSCALL_STANDARD std, void *v);
+        void report(ofstream& result);
+        int getRank();
+        void insCount(uint32_t ins_count_in, THREADID threadid);
+        ~CoreManager();        
+    private:
+        void drainMemReqs(THREADID threadid);
+        bool isOtherThreadWaiting(THREADID threadid);
         void sysBefore(ADDRINT ip, ADDRINT num, ADDRINT arg0, ADDRINT arg1, ADDRINT arg2, 
                ADDRINT arg3, ADDRINT arg4, ADDRINT arg5, THREADID threadid);
         void sysAfter(ADDRINT ret, THREADID threadid);
-        void syscallEntry(THREADID threadIndex, CONTEXT *ctxt, SYSCALL_STANDARD std, void *v);
-        void syscallExit(THREADID threadIndex, CONTEXT *ctxt, SYSCALL_STANDARD std, void *v);
-        void report(ofstream *result);
-        void drainMemReqs(THREADID threadid);
-        ~CoreManager();        
-    private:
-        double getAvgCycle(THREADID threadid);
+        double getAvgCycle();
         void barrier(THREADID threadid);
         struct timespec sim_start_time;
         struct timespec sim_finish_time;
-        ThreadData cycle[THREAD_MAX];
-        ThreadData ins_nonmem[THREAD_MAX];
-        ThreadData ins_count[THREAD_MAX];
-        MsgMem   *msg_mem[THREAD_MAX];
-        int delay[THREAD_MAX];
-        int core[THREAD_MAX];
-        int mpi_pos[THREAD_MAX];
-        int thread_state[THREAD_MAX];
-        SysFutex sys_wake[THREAD_MAX];
-        SysFutex sys_wait[THREAD_MAX];
-        uint32_t  thread_map[THREAD_MAX];
-        int num_threads;
+        ThreadData thread_data[THREAD_MAX];
+        int num_threads_online;
         int num_procs;
         int max_threads;
         int barrier_counter;
         uint64_t barrier_time;
         double cpi_nonmem;
         double freq;
-        double sim_time;
         int syscall_count;
         int sync_syscall_count;
         int max_msg_size;
@@ -140,6 +140,7 @@ class CoreManager
         PIN_MUTEX mutex;
         PIN_SEMAPHORE sem;
         int rank;
+        MPI_Comm comm;
 
 };
 

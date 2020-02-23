@@ -86,7 +86,7 @@ typedef struct CacheLevel
 class System
 {
     public:
-        void init(XmlSys* xml_sys);
+        void init(const XmlSys* xml_sys);
         Cache* init_caches(int level, int cache_id);
         void init_directories(int home_id);
         int access(int core_id, InsMem* ins_mem, int64_t timer);
@@ -105,7 +105,7 @@ class System
         int getHomeId(InsMem *ins_mem);
         int tlb_translate(InsMem *ins_mem, int core_id, int64_t timer);
         int getCoreCount();
-        void report(ofstream* result);
+        void report(ofstream& result_ofstream);
         ~System();        
     private:
         int        sys_type;
@@ -124,7 +124,7 @@ class System
         int        total_num_broadcast;
         double     total_bus_contention;
         int*       home_stat;
-        XmlSys*    xml_sys;
+        const XmlSys*    xml_sys;
         CacheLevel* cache_level;
         Cache***   cache;
         Cache**    directory_cache;

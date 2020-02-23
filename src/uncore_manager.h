@@ -46,25 +46,75 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "mpi.h"
 
+#define THREAD_MAX 32
 
+
+
+class UncoreManager;
+
+struct UncoreThreadArgs {
+    UncoreManager* uncore_manager;
+    int tid;
+};
+
+
+struct UncoreThreadData {
+    pthread_t handle;
+    MPIMsg* msgs = NULL;
+    UncoreThreadArgs args;
+
+    void init(UncoreManager* uncore_manager, int max_msg_size, int tid) {
+        msgs = new MPIMsg[max_msg_size + 1];
+        assert(msgs != NULL);
+        memset(msgs, 0, (max_msg_size + 1)*sizeof(MPIMsg));
+        args.uncore_manager = uncore_manager;
+        args.tid = tid;
+    }
+
+    ~UncoreThreadData() {
+        if (msgs != NULL) {
+            delete [] msgs;
+        }
+    }
+};
 
 class UncoreManager
 {
-    public:
-        void init(XmlSim* xml_sim);
-        void getSimStartTime();
-        void getSimFinishTime();
-        int allocCore(int prog_id, int thread_id);
-        int deallocCore(int prog_id, int thread_id);
-        int getCoreId(int prog_id, int thread_id);
-        int uncore_access(int core_id, InsMem* ins_mem, int64_t timer);
-        void report(ofstream *result);
-        ~UncoreManager();        
-    private:
-        struct timespec sim_start_time;
-        struct timespec sim_finish_time;
-        System sys;
-        ThreadSched thread_sched;
+public:
+    void init(const XmlSim* xml_sim, const char* result_basename);
+
+    void report();
+    void msgHandler(int my_tid); 
+    void spawn_threads();  
+    void collect_threads();      
+    ~UncoreManager();
+private:
+    struct timespec sim_start_time;
+    struct timespec sim_finish_time;
+    System sys;
+    ThreadSched thread_sched;
+    ofstream result_ofstream;
+    pthread_mutex_t mutex;
+    int max_msg_size;
+    int num_threads;
+    MPI_Comm   comm;
+    UncoreThreadData thread_data[THREAD_MAX];
+
+    void lock();
+    void unlock();
+    void add_proc(int proc_id);
+    void rm_proc(int proc_id) ;
+    int get_num_threads();
+    int get_max_msg_size();
+    int allocCore(int prog_id, int thread_id);
+    int deallocCore(int prog_id, int thread_id);
+    int getCoreId(int prog_id, int thread_id);
+    int uncore_access(int core_id, InsMem* ins_mem, int64_t timer);
+    void getSimStartTime();
+    void getSimFinishTime();
+public:
+    std::list<int> proc_list;
+    int barrier_proc_count = 0;
 };
 
 

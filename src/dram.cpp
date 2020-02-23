@@ -47,11 +47,11 @@ int Dram::access(InsMem * ins_mem)
 }
 
 
-void Dram::report(ofstream* result)
+void Dram::report(ofstream& result_ofstream)
 {
 
-    *result << "DRAM Statistics:\n";
-    *result << "Total # of DRAM accesses: " << num_accesses <<endl;
+    result_ofstream << "DRAM Statistics:\n";
+    result_ofstream << "Total # of DRAM accesses: " << num_accesses <<endl;
 }
 
 Dram::~Dram()

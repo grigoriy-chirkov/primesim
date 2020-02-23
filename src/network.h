@@ -72,7 +72,7 @@ class Network
 {
     public:
        ~Network();
-       bool init(int num_nodes_in, XmlNetwork* xml_net);
+       bool init(int num_nodes_in, const XmlNetwork* xml_net);
        uint64_t transmit(int sender, int receiver, int data_len, uint64_t timer);
        int getNumNodes();
        int getNetType();
@@ -81,7 +81,7 @@ class Network
        Coord getLoc(int node_id); 
        int getNodeId(Coord loc);
        Link* getLink(Coord node_id, Direction direction);
-       void report(ofstream* result);
+       void report(ofstream& result_ofstream);
    private:
        int net_type;
        int num_nodes;

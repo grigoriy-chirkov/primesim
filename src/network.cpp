@@ -43,7 +43,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 using namespace std;
 
-bool Network::init(int num_nodes_in, XmlNetwork* xml_net)
+bool Network::init(int num_nodes_in, const XmlNetwork* xml_net)
 {
     int i, j, k;
     num_nodes = num_nodes_in;
@@ -307,19 +307,19 @@ Link* Network::getLink(Coord node_id, Direction direction)
 }
 
 
-void Network::report(ofstream* result)
+void Network::report(ofstream& result_ofstream)
 {
 
     avg_delay = (double)total_delay / num_access; 
-    *result << "Network Stat:\n";
-    *result << "# of accesses: " << num_access <<endl;
-    *result << "Total network communication distance: " << total_distance <<endl;
-    *result << "Total network delay: " << total_delay <<endl;
-    *result << "Total router delay: " << total_router_delay <<endl;
-    *result << "Total link delay: " << total_link_delay <<endl;
-    *result << "Total inject delay: " << total_inject_delay <<endl;
-    *result << "Total contention delay: " << total_link_delay - total_distance*link_delay <<endl;
-    *result << "Average network delay: " << avg_delay <<endl <<endl;
+    result_ofstream << "Network Stat:\n";
+    result_ofstream << "# of accesses: " << num_access <<endl;
+    result_ofstream << "Total network communication distance: " << total_distance <<endl;
+    result_ofstream << "Total network delay: " << total_delay <<endl;
+    result_ofstream << "Total router delay: " << total_router_delay <<endl;
+    result_ofstream << "Total link delay: " << total_link_delay <<endl;
+    result_ofstream << "Total inject delay: " << total_inject_delay <<endl;
+    result_ofstream << "Total contention delay: " << total_link_delay - total_distance*link_delay <<endl;
+    result_ofstream << "Average network delay: " << avg_delay <<endl <<endl;
 }
 
 Network::~Network()

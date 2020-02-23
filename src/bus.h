@@ -42,7 +42,7 @@ class Bus
 {
     public:
         ~Bus();
-        bool init(XmlBus* xml_bus);
+        bool init(const XmlBus* xml_bus);
         uint64_t access(uint64_t timer, bool is_data);
     private:
         bool unlim_bw;

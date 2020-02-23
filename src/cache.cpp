@@ -47,7 +47,7 @@ using namespace std;
 
 
 
-void Cache::init(XmlCache* xml_cache, Bus* bus_in, CacheType cache_type_in, int page_size_in, int level_in, int cache_id_in)
+void Cache::init(const XmlCache* xml_cache, Bus* bus_in, CacheType cache_type_in, int page_size_in, int level_in, int cache_id_in)
 {
     ins_count = 0;;
     miss_count = 0;
@@ -423,17 +423,17 @@ uint64_t Cache::getEvictCount()
 
 
 
-void Cache::report(ofstream* result)
+void Cache::report(ofstream& result)
 {
-    *result << "=================================================================\n";
-    *result << "Simulation results for "<< size << " Bytes " << num_ways
+    result << "=================================================================\n";
+    result << "Simulation results for "<< size << " Bytes " << num_ways
             << "-way set associative cache model:\n";
-    *result << "The total # of memory instructions: " << ins_count << endl;
-    *result << "The # of cache-missed instructions: " << miss_count << endl;
-    *result << "The # of evicted instructions: " << evict_count << endl;
-    *result << "The # of writeback instructions: " << wb_count << endl;
-    *result << "The cache miss rate: " << 100 * (double)miss_count/ (double)ins_count << "%" << endl;
-    *result << "=================================================================\n\n";
+    result << "The total # of memory instructions: " << ins_count << endl;
+    result << "The # of cache-missed instructions: " << miss_count << endl;
+    result << "The # of evicted instructions: " << evict_count << endl;
+    result << "The # of writeback instructions: " << wb_count << endl;
+    result << "The cache miss rate: " << 100 * (double)miss_count/ (double)ins_count << "%" << endl;
+    result << "=================================================================\n\n";
 }
 
 Cache::~Cache()

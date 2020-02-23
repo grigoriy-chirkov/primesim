@@ -41,7 +41,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "system.h"
 #include "common.h"
 
-void System::init(XmlSys* xml_sys_in)
+void System::init(const XmlSys* xml_sys_in)
 {
     xml_sys = xml_sys_in;
     sys_type = xml_sys->sys_type;
@@ -166,7 +166,7 @@ int System::access(int core_id, InsMem* ins_mem, int64_t timer)
     else {
         if (protocol == WRITE_UPDATE) {
             write_update_bus(cache[0][core_id], 0, cache_id, core_id, ins_mem, timer + delay[core_id]);
-        } else {            
+        } else {          
             mesi_bus(cache[0][core_id], 0, cache_id, core_id, ins_mem, timer + delay[core_id]);
         }
     }
@@ -1049,38 +1049,38 @@ int System::getCoreCount()
 }
 
 
-void System::report(ofstream* result)
+void System::report(ofstream& result_ofstream)
 {
     uint64_t ins_count = 0, miss_count = 0, evict_count = 0, wb_count = 0;
     double miss_rate = 0;
    
-    network.report(result); 
-    dram.report(result); 
-    *result << endl <<  "Simulation result for cache system: \n\n";
+    network.report(result_ofstream); 
+    dram.report(result_ofstream); 
+    result_ofstream << endl <<  "Simulation result for cache system: \n\n";
     
     if (verbose_report) {
-        *result << "Home Occupation:\n";
+        result_ofstream << "Home Occupation:\n";
         if (network.getNetType() == MESH_3D) {
-            *result << "Allocated home locations in 3D coordinates:" << endl;
+            result_ofstream << "Allocated home locations in 3D coordinates:" << endl;
             for (int i = 0; i < network.getNumNodes(); i++) {
                 if (home_stat[i]) {
                     Coord loc = network.getLoc(i); 
-                    *result << "("<<loc.x<<", "<<loc.y<<", "<<loc.z<<")\n";
+                    result_ofstream << "("<<loc.x<<", "<<loc.y<<", "<<loc.z<<")\n";
                 }
             }
         }
         else {
-            *result << "Allocated home locations in 2D coordinates:" << endl;
+            result_ofstream << "Allocated home locations in 2D coordinates:" << endl;
             for (int i = 0; i < network.getNumNodes(); i++) {
                 if (home_stat[i]) {
                     Coord loc = network.getLoc(i); 
-                    *result << "("<<loc.x<<", "<<loc.y<<")\n";
+                    result_ofstream << "("<<loc.x<<", "<<loc.y<<")\n";
                 }
              }
         }
-        *result << endl;
+        result_ofstream << endl;
     }
-    *result << endl;
+    result_ofstream << endl;
 
     if (tlb_enable) {
         ins_count =0;   
@@ -1094,23 +1094,23 @@ void System::report(ofstream* result)
         }
         miss_rate = (double)miss_count / (double)ins_count; 
            
-        *result << "TLB Cache"<<"===========================================================\n";
-        *result << "Simulation results for "<< xml_sys->tlb_cache.size << " Bytes " << xml_sys->tlb_cache.num_ways
+        result_ofstream << "TLB Cache"<<"===========================================================\n";
+        result_ofstream << "Simulation results for "<< xml_sys->tlb_cache.size << " Bytes " << xml_sys->tlb_cache.num_ways
                    << "-way set associative cache model:\n";
-        *result << "The total # of TLB access instructions: " << ins_count << endl;
-        *result << "The # of cache-missed instructions: " << miss_count << endl;
-        *result << "The # of replaced instructions: " << evict_count << endl;
-        *result << "The cache miss rate: " << 100 * miss_rate << "%" << endl;
-        *result << "=================================================================\n\n";
+        result_ofstream << "The total # of TLB access instructions: " << ins_count << endl;
+        result_ofstream << "The # of cache-missed instructions: " << miss_count << endl;
+        result_ofstream << "The # of replaced instructions: " << evict_count << endl;
+        result_ofstream << "The cache miss rate: " << 100 * miss_rate << "%" << endl;
+        result_ofstream << "=================================================================\n\n";
         
         if (verbose_report) {
-            page_table.report(result);
+            page_table.report(result_ofstream);
         }
     } 
 
-    *result << endl;
-    *result << "Total delay caused by bus contention: " << total_bus_contention <<" cycles\n";
-    *result << "Total # of broadcast: " << total_num_broadcast <<"\n\n";
+    result_ofstream << endl;
+    result_ofstream << "Total delay caused by bus contention: " << total_bus_contention <<" cycles\n";
+    result_ofstream << "Total # of broadcast: " << total_num_broadcast <<"\n\n";
 
     for (int i = 0; i < num_levels; i++) {
         ins_count =0;   
@@ -1128,15 +1128,15 @@ void System::report(ofstream* result)
         }
         miss_rate = (double)miss_count / (double)ins_count; 
 
-        *result << "LEVEL"<<i<<"===========================================================\n";
-        *result << "Simulation results for "<< cache_level[i].size << " Bytes " << cache_level[i].num_ways
+        result_ofstream << "LEVEL"<<i<<"===========================================================\n";
+        result_ofstream << "Simulation results for "<< cache_level[i].size << " Bytes " << cache_level[i].num_ways
                    << "-way set associative cache model:\n";
-        *result << "The total # of memory instructions: " << ins_count << endl;
-        *result << "The # of cache-missed instructions: " << miss_count << endl;
-        *result << "The # of evicted instructions: " << evict_count << endl;
-        *result << "The # of writeback instructions: " << wb_count << endl;
-        *result << "The cache miss rate: " << 100 * miss_rate << "%" << endl;
-        *result << "=================================================================\n\n";
+        result_ofstream << "The total # of memory instructions: " << ins_count << endl;
+        result_ofstream << "The # of cache-missed instructions: " << miss_count << endl;
+        result_ofstream << "The # of evicted instructions: " << evict_count << endl;
+        result_ofstream << "The # of writeback instructions: " << wb_count << endl;
+        result_ofstream << "The cache miss rate: " << 100 * miss_rate << "%" << endl;
+        result_ofstream << "=================================================================\n\n";
     }
     
     ins_count =0;   
@@ -1154,51 +1154,51 @@ void System::report(ofstream* result)
     }
     miss_rate = (double)miss_count / (double)ins_count; 
        
-    *result << "Directory Cache"<<"===========================================================\n";
-    *result << "Simulation results for "<< xml_sys->directory_cache.size << " Bytes " << xml_sys->directory_cache.num_ways
+    result_ofstream << "Directory Cache"<<"===========================================================\n";
+    result_ofstream << "Simulation results for "<< xml_sys->directory_cache.size << " Bytes " << xml_sys->directory_cache.num_ways
                << "-way set associative cache model:\n";
-    *result << "The total # of memory instructions: " << ins_count << endl;
-    *result << "The # of cache-missed instructions: " << miss_count << endl;
-    *result << "The # of replaced instructions: " << evict_count << endl;
-    *result << "The cache miss rate: " << 100 * miss_rate << "%" << endl;
-    *result << "=================================================================\n\n";
+    result_ofstream << "The total # of memory instructions: " << ins_count << endl;
+    result_ofstream << "The # of cache-missed instructions: " << miss_count << endl;
+    result_ofstream << "The # of replaced instructions: " << evict_count << endl;
+    result_ofstream << "The cache miss rate: " << 100 * miss_rate << "%" << endl;
+    result_ofstream << "=================================================================\n\n";
 
 
     if (verbose_report) {
-        *result << "Statistics for each cache with non-zero accesses: \n\n";
+        result_ofstream << "Statistics for each cache with non-zero accesses: \n\n";
         for (int i = 0; i < num_levels; i++) {
-            *result << "LEVEL"<<i<<"*****************************************************\n\n";
+            result_ofstream << "LEVEL"<<i<<"*****************************************************\n\n";
             for (int j = 0; j < cache_level[i].num_caches; j++) {
                 if (cache[i][j] != NULL) {
                     if (cache[i][j]->getInsCount() > 0) {
-                        *result << "The " <<j<<"th cache:\n";
-                        cache[i][j]->report(result);
+                        result_ofstream << "The " <<j<<"th cache:\n";
+                        cache[i][j]->report(result_ofstream);
                     }
                 }
              }
-            *result << "************************************************************\n\n";
+            result_ofstream << "************************************************************\n\n";
         }
 
         if (directory_cache != NULL) {
-            *result << "****************************************************" <<endl;
-            *result << "Statistics for each directory caches with non-zero accesses" <<endl;
+            result_ofstream << "****************************************************" <<endl;
+            result_ofstream << "Statistics for each directory caches with non-zero accesses" <<endl;
             for (int i = 0; i < network.getNumNodes(); i++) {
                 if (directory_cache[i] != NULL) {
                     if (directory_cache[i]->getInsCount() > 0) {
-                        *result << "Report for directory cache "<<i<<endl;
-                        directory_cache[i]->report(result);
+                        result_ofstream << "Report for directory cache "<<i<<endl;
+                        directory_cache[i]->report(result_ofstream);
                     }
                 }
             }
         }
 
         if (tlb_cache != NULL) {
-            *result << "****************************************************" <<endl;
-            *result << "Statistics for each TLB cache with non-zero accesses" <<endl;
+            result_ofstream << "****************************************************" <<endl;
+            result_ofstream << "Statistics for each TLB cache with non-zero accesses" <<endl;
             for (int i = 0; i < num_cores; i++) {
                 if (tlb_cache[i].getInsCount() > 0) {
-                    *result << "Report for tlb cache "<<i<<endl;
-                    tlb_cache[i].report(result);
+                    result_ofstream << "Report for tlb cache "<<i<<endl;
+                    tlb_cache[i].report(result_ofstream);
                 }
             }
         }

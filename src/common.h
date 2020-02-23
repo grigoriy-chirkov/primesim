@@ -31,9 +31,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifndef COMMON_H
 #define COMMON_H
 
+#include "mpi.h"
 
-#define PADSIZE 56  // 64 byte line size: 64-8
-#define THREAD_MAX  1024 // Maximum number of threads in one process
+
+
 
 enum MessageTypes
 {
@@ -46,17 +47,23 @@ enum MessageTypes
     PROGRAM_EXITING = -5
 };
 
-typedef struct MsgMem
+struct MPIMsg
 {
-    bool        mem_type; //1 means write, 0 means read
-    int         mem_size; 
-    uint64_t    addr_dmem; 
-    union
-    {
-        int64_t     timer;
-        int64_t     message_type;
+    union {
+        struct {
+            uint64_t     message_type;
+            uint64_t     thread_id;
+            uint64_t     payload_len;
+        };
+        struct {
+            bool        mem_type; //1 means write, 0 means read
+            int         mem_size; 
+            uint64_t    addr_dmem; 
+            int64_t     timer;
+
+        };
     };
-} MsgMem;
+};
 
 enum MemType
 {
@@ -65,6 +72,39 @@ enum MemType
     WB    = 2   //writeback
 };
 
+enum ThreadState
+{
+    DEAD    = 0,
+    ACTIVE  = 1,
+    SUSPEND = 2,
+    FINISH  = 3,
+    WAIT    = 4
+};
+
+static void createCommWithoutUncore(MPI_Comm comm, MPI_Comm* barrier_comm) {
+    // Create new new communicator without uncore process to 
+    // barrier all core processes before simulation start
+    int rc;
+    int rank_excl[1] = {0};
+    MPI_Group prime_group, barrier_group;
+    rc = MPI_Comm_group(comm, &prime_group); 
+    if (rc != MPI_SUCCESS) {
+        std::cerr << "Could not extract group. Terminating.\n";
+        MPI_Abort(MPI_COMM_WORLD, rc);
+    }
+
+    rc = MPI_Group_excl(prime_group, 1, rank_excl, &barrier_group);
+    if (rc != MPI_SUCCESS) {
+        std::cerr << "Could not create barrier group. Terminating.\n";
+        MPI_Abort(MPI_COMM_WORLD, rc);
+    }
+
+    rc = MPI_Comm_create(comm, barrier_group, barrier_comm);
+    if (rc != MPI_SUCCESS) {
+        std::cerr << "Could not create barrier comm. Terminating.\n";
+        MPI_Abort(MPI_COMM_WORLD, rc);
+    }
+}
 
 
 

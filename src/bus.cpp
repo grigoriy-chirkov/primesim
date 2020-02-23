@@ -41,7 +41,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 using namespace std;
 
-bool Bus::init(XmlBus* xml_bus)
+bool Bus::init(const XmlBus* xml_bus)
 {
     if (xml_bus == NULL) {
       unlim_bw = false;
