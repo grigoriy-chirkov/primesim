@@ -65,21 +65,13 @@ void CoreManager::init(XmlSim* xml_sim, MPI_Comm _comm)
     num_recv_threads = xml_sim->num_recv_threads;
     comm = _comm;
 
-    rc = MPI_Comm_size(comm,&num_procs);
-    if (rc != MPI_SUCCESS) {
-        cerr << "Process not in the communicator. Terminating.\n";
-        MPI_Abort(MPI_COMM_WORLD, rc);
-    }
     rc = MPI_Comm_rank(comm,&rank);
     if (rc != MPI_SUCCESS) {
         cerr << "Process not in the communicator. Terminating.\n";
         MPI_Abort(MPI_COMM_WORLD, rc);
     }
 
-    //# of core processes equals num_tasks-1 because there is a uncore process
-    num_procs--;
-
-    for(int i = 0; i < THREAD_MAX; i++) {
+    for(int i = 0; i < CORE_THREAD_MAX; i++) {
         thread_data[i].init(max_msg_size);
     }
 
@@ -94,7 +86,8 @@ void CoreManager::startSim()
     auto& tdata = thread_data[0];
     auto& msg = tdata.msgs[0];
     msg.message_type = PROCESS_STARTING;
-    msg.thread_id = 0;
+    msg.tid = 0;
+    msg.pid = rank;
     msg.payload_len = 1;
     MPI_Send(&msg, sizeof(MPIMsg), MPI_CHAR, 0, 0, comm);
 
@@ -110,23 +103,22 @@ void CoreManager::startSim()
         MPI_Abort(MPI_COMM_WORLD, rc);
     }
 
-
     MPI_Barrier(barrier_comm);
     barrier_time = thread_sync_interval;
 }
 
 
 // This function is called before every instruction is executed
-void CoreManager::insCount(uint32_t ins_count_in, THREADID threadid)
+void CoreManager::insCount(uint32_t ins_count_in, THREADID tid)
 {
-    thread_data[threadid].ins_count += ins_count_in;
+    thread_data[tid].ins_count += ins_count_in;
 }
 
 
-bool CoreManager::isOtherThreadWaiting(THREADID threadid) 
+bool CoreManager::isOtherThreadWaiting(THREADID tid) 
 {
     for(uint32_t i = 0; i< max_threads; i++) {
-        if(i != threadid && thread_data[i].thread_state == WAIT) {
+        if(i != tid && thread_data[i].thread_state == WAIT) {
             return true;
         }    
     }
@@ -134,9 +126,9 @@ bool CoreManager::isOtherThreadWaiting(THREADID threadid)
 }
 
 // This function implements periodic barriers across all threads within one process and all processes 
-void CoreManager::barrier(THREADID threadid)
+void CoreManager::barrier(THREADID tid)
 {
-    auto& tdata = thread_data[threadid];
+    auto& tdata = thread_data[tid];
     
     if ( (num_threads_online < 2) || 
          (tdata.thread_state != ACTIVE) || 
@@ -145,7 +137,7 @@ void CoreManager::barrier(THREADID threadid)
 
     //Send out all remaining memory requests in the buffer
     if (tdata.mpi_pos > 1) {
-        drainMemReqs(threadid);
+        drainMemReqs(tid);
     }
 
     PIN_MutexLock(&mutex);
@@ -154,7 +146,7 @@ void CoreManager::barrier(THREADID threadid)
     
     if (barrier_counter == 0) {
         // Wait until all threads from previous barrier leave it
-        while(isOtherThreadWaiting(threadid));
+        while(isOtherThreadWaiting(tid));
         PIN_SemaphoreClear(&sem);
     }
     
@@ -223,21 +215,21 @@ double CoreManager::getAvgCycle()
 
 
 // Handle non-memory instructions
-void CoreManager::execNonMem(uint32_t ins_count_in, THREADID threadid)
+void CoreManager::execNonMem(uint32_t ins_count_in, THREADID tid)
 {
-    auto& tdata = thread_data[threadid];
+    auto& tdata = thread_data[tid];
     tdata.cycle += cpi_nonmem * ins_count_in;
     tdata.ins_nonmem += ins_count_in;
-    barrier(threadid); 
+    //barrier(tid); 
 }
 
 
 
 
 // Handle a memory instruction
-void CoreManager::execMem(void * addr, THREADID threadid, uint32_t size, BOOL mem_type)
+void CoreManager::execMem(void * addr, THREADID tid, uint32_t size, BOOL mem_type)
 {
-    ThreadData& tdata = thread_data[threadid];
+    ThreadData& tdata = thread_data[tid];
     MPIMsg& msg = tdata.msgs[tdata.mpi_pos];
     msg.mem_type = mem_type;
     msg.addr_dmem = (uint64_t) addr;
@@ -247,22 +239,23 @@ void CoreManager::execMem(void * addr, THREADID threadid, uint32_t size, BOOL me
     tdata.cycle += 1;
     tdata.mpi_pos++;
     if (tdata.mpi_pos >= (max_msg_size + 1)) {
-        drainMemReqs(threadid);
+        drainMemReqs(tid);
     }
-    barrier(threadid);
+    //barrier(tid);
 }
 
-void CoreManager::drainMemReqs(THREADID threadid) {
-    ThreadData& tdata = thread_data[threadid];
+void CoreManager::drainMemReqs(THREADID tid) {
+    ThreadData& tdata = thread_data[tid];
     tdata.delay = 0;
     
     MPIMsg& msg = tdata.msgs[0];
     msg.message_type = MEM_REQUESTS;
-    msg.thread_id = threadid;
+    msg.tid = tid;
+    msg.pid = rank;
     msg.payload_len = tdata.mpi_pos;
 
-    MPI_Send(tdata.msgs, tdata.mpi_pos * sizeof(MPIMsg), MPI_CHAR, 0, tdata.uncore_thread, comm);
-    MPI_Recv(&tdata.delay, 1, MPI_INT, 0, threadid, comm, MPI_STATUS_IGNORE);
+    MPI_Send(tdata.msgs, tdata.mpi_pos * sizeof(MPIMsg), MPI_CHAR, 0, 0, comm);
+    MPI_Recv(&tdata.delay, 1, MPI_INT, 0, tid, comm, MPI_STATUS_IGNORE);
     
     if(tdata.delay == -1) {
         cerr<<"An error occurs in cache system\n";
@@ -274,13 +267,13 @@ void CoreManager::drainMemReqs(THREADID threadid) {
 }
 
 // This routine is executed every time a thread starts.
-void CoreManager::threadStart(THREADID threadid, CONTEXT *ctxt, int32_t flags, void *v)
+void CoreManager::threadStart(THREADID tid, CONTEXT *ctxt, int32_t flags, void *v)
 {
     PIN_MutexLock(&mutex);
-    ThreadData& tdata = thread_data[threadid];
+    ThreadData& tdata = thread_data[tid];
 
 
-    if( threadid >= THREAD_MAX ) {
+    if( tid >= CORE_THREAD_MAX ) {
         cerr << "Error: the number of threads exceeds the limit!\n";
     }
     int i;
@@ -299,56 +292,57 @@ void CoreManager::threadStart(THREADID threadid, CONTEXT *ctxt, int32_t flags, v
     max_threads++; 
     tdata.thread_state = ACTIVE;
     tdata.core_thread = PIN_GetTid();
-    cout << "[PriME] Pin thread " << threadid << " from process " << getRank() << " begins at cycle "<< (uint64_t)tdata.cycle<< endl;
+    cout << "[PriME] Pin thread " << tid << " from process " << getRank() << " begins at cycle "<< (uint64_t)tdata.cycle<< endl;
 
     PIN_MutexUnlock(&mutex);
 
     MPIMsg& msg = tdata.msgs[0];
     msg.message_type = NEW_THREAD;
-    msg.thread_id = threadid;
+    msg.tid = tid;
+    msg.pid = rank;
     msg.payload_len = 1;
 
-    MPI_Send(&msg, sizeof(MPIMsg), MPI_CHAR, 0, tdata.uncore_thread, comm);
-    MPI_Recv(&tdata.uncore_thread, 1, MPI_INT, 0, threadid, comm, MPI_STATUS_IGNORE);
+    MPI_Send(&msg, sizeof(MPIMsg), MPI_CHAR, 0, 0, comm);
 }
 
 
 // This routine is executed every time a thread is destroyed.
-void CoreManager::threadFini(THREADID threadid, const CONTEXT *ctxt, int32_t code, void *v)
+void CoreManager::threadFini(THREADID tid, const CONTEXT *ctxt, int32_t code, void *v)
 {
-    auto& tdata = thread_data[threadid];
+    auto& tdata = thread_data[tid];
     //Send out all remaining memory requests in the buffer
     if(tdata.mpi_pos > 1) {
-        drainMemReqs(threadid);
+        drainMemReqs(tid);
     }
 
     PIN_MutexLock(&mutex);
 
     num_threads_online--;
     tdata.thread_state = FINISH;
-    cout << "[PriME] Thread " << threadid << " from process " << getRank() << " finishes at cycle "<< (uint64_t)tdata.cycle <<endl;
+    cout << "[PriME] Thread " << tid << " from process " << getRank() << " finishes at cycle "<< (uint64_t)tdata.cycle <<endl;
     PIN_MutexUnlock(&mutex);
 
 
     MPIMsg& msg = tdata.msgs[0];
     msg.message_type = THREAD_FINISHING;
-    msg.thread_id = threadid;
+    msg.tid = tid;
+    msg.pid = rank;
     msg.payload_len = 1;
 
-    MPI_Send(&msg, sizeof(MPIMsg), MPI_CHAR, 0, tdata.uncore_thread, comm);
+    MPI_Send(&msg, sizeof(MPIMsg), MPI_CHAR, 0, 0, comm);
 }
 
 
 // Called before syscalls
 void CoreManager::sysBefore(ADDRINT ip, ADDRINT num, ADDRINT arg0, ADDRINT arg1, ADDRINT arg2, 
-               ADDRINT arg3, ADDRINT arg4, ADDRINT arg5, THREADID threadid)
+               ADDRINT arg3, ADDRINT arg4, ADDRINT arg5, THREADID tid)
 {
     if((num == SYS_futex &&  ((arg1&FUTEX_CMD_MASK) == FUTEX_WAIT || (arg1&FUTEX_CMD_MASK) == FUTEX_LOCK_PI))
     ||  num == SYS_wait4
     ||  num == SYS_waitid) {
         PIN_MutexLock(&mutex);
 
-        auto& tdata = thread_data[threadid];
+        auto& tdata = thread_data[tid];
 
         if(tdata.thread_state == ACTIVE) {
             tdata.thread_state = SUSPEND;
@@ -361,11 +355,11 @@ void CoreManager::sysBefore(ADDRINT ip, ADDRINT num, ADDRINT arg0, ADDRINT arg1,
 }
 
 // Called after syscalls
-void CoreManager::sysAfter(ADDRINT ret, THREADID threadid)
+void CoreManager::sysAfter(ADDRINT ret, THREADID tid)
 {
     PIN_MutexLock(&mutex);
 
-    auto& tdata = thread_data[threadid];
+    auto& tdata = thread_data[tid];
     if (tdata.thread_state == SUSPEND) {
         tdata.cycle = getAvgCycle();
         tdata.thread_state = ACTIVE;
@@ -457,7 +451,6 @@ void CoreManager::report(ofstream& result)
 
 void CoreManager::finishSim(int32_t code, void *v)
 {
-
     uint64_t total_ins_counts = 0;
     for (int i = 0; i < max_threads; i++) {
         total_ins_counts += thread_data[i].ins_count;
@@ -476,17 +469,11 @@ void CoreManager::finishSim(int32_t code, void *v)
     auto& tdata = thread_data[0];
     auto& msg = tdata.msgs[0];
     msg.message_type = PROCESS_FINISHING;
-    msg.payload_len = 0;
-    msg.thread_id = 0;
+    msg.payload_len = 1;
+    msg.tid = 0;
+    msg.pid = rank;
 
     MPI_Send(&msg, sizeof(MPIMsg), MPI_CHAR, 0, 0, comm);
-    MPI_Recv(&num_procs, 1, MPI_INT, 0, 0, comm, MPI_STATUS_IGNORE);
-    if (num_procs == 0) {
-        for (int i = 0; i < num_recv_threads; i++) {
-            msg.message_type = PROGRAM_EXITING;
-            MPI_Send(&msg, sizeof(MPIMsg), MPI_CHAR, 0, i, comm);
-        }
-    }
     MPI_Finalize();
 }
 

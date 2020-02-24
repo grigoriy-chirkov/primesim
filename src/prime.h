@@ -35,17 +35,5 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "pthread.h"
 
 
-struct thread_buffer_t {
-    MPIMsg* msgs;
-    pthread_mutex_t mutex;
-    pthread_cond_t can_produce;
-    pthread_cond_t can_consume;
-};
-
-
-
-
-
-
 
 #endif //PRIME_H

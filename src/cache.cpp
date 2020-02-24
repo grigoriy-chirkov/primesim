@@ -186,7 +186,7 @@ Line* Cache::accessLine(InsMem* ins_mem)
     set_cur = findSet(addr_temp.index);
     assert(set_cur != NULL);
     for (i = 0; i < num_ways; i++) {
-        if( (set_cur[i].id == ins_mem->prog_id)
+        if( (set_cur[i].id == ins_mem->pid)
         &&  (set_cur[i].tag == addr_temp.tag)
         &&   set_cur[i].state) {
             return &set_cur[i];
@@ -209,7 +209,7 @@ Line* Cache::replaceLine(InsMem* ins_mem_old, InsMem* ins_mem)
     
     for (i = 0; i < num_ways; i++) {
         if (set_cur[i].state == I) {
-           set_cur[i].id = ins_mem->prog_id; 
+           set_cur[i].id = ins_mem->pid; 
            set_cur[i].tag = addr_temp.tag;
            return &set_cur[i]; 
         }
@@ -220,10 +220,10 @@ Line* Cache::replaceLine(InsMem* ins_mem_old, InsMem* ins_mem)
     addr_old.offset = 0;
     addrCompose(&addr_old, &addr_dmem_old);
     
-    ins_mem_old->prog_id = set_cur[way_rp].id;
+    ins_mem_old->pid = set_cur[way_rp].id;
     ins_mem_old->addr_dmem = addr_dmem_old;
 
-    set_cur[way_rp].id = ins_mem->prog_id; 
+    set_cur[way_rp].id = ins_mem->pid; 
     set_cur[way_rp].tag = addr_temp.tag;
 
 
@@ -248,7 +248,7 @@ Line* Cache::directAccess(int set, int way, InsMem* ins_mem)
         addr.offset = 0;
         addrCompose(&addr, &addr_dmem);
         
-        ins_mem->prog_id = set_cur[way].id;
+        ins_mem->pid = set_cur[way].id;
         ins_mem->addr_dmem = addr_dmem;
         return &set_cur[way];
     }
@@ -290,7 +290,7 @@ Line* Cache::flushLine(int set, int way, InsMem* ins_mem_old)
         addr_old.offset = 0;
         addrCompose(&addr_old, &addr_dmem_old);
         
-        ins_mem_old->prog_id = set_cur[way].id;
+        ins_mem_old->pid = set_cur[way].id;
         ins_mem_old->addr_dmem = addr_dmem_old;
 
         return &set_cur[way];

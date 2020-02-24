@@ -48,10 +48,10 @@ class ThreadSched
 {
     public:
         void init(int num_cores_in);
-        int allocCore(int prog_id, int thread_id);
-        int deallocCore(int prog_id, int thread_id);
-        int getCoreId(int prog_id, int thread_id);
-        int getThreadCount(int prog_id);
+        int allocCore(int pid, int tid);
+        int deallocCore(int pid, int tid);
+        int getCoreId(int pid, int tid);
+        int getThreadCount(int pid);
         void report(ofstream& result);
         ~ThreadSched();        
     private:

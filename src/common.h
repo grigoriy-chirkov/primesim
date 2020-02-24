@@ -52,7 +52,8 @@ struct MPIMsg
     union {
         struct {
             uint64_t     message_type;
-            uint64_t     thread_id;
+            uint64_t     tid;
+            uint64_t     pid;
             uint64_t     payload_len;
         };
         struct {
@@ -106,6 +107,8 @@ static void createCommWithoutUncore(MPI_Comm comm, MPI_Comm* barrier_comm) {
     }
 }
 
+#define UNCORE_THREAD_MAX 32
+#define CORE_THREAD_MAX 1024
 
 
 #endif  // COMMON_H

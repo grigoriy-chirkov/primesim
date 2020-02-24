@@ -42,28 +42,51 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "common.h"
 
 // Handle receiving MPI messages and send back responses
-void *msgHandlerWrapper(void *args)
+void *msgProducerWrapper(void *args)
 {
-    UncoreThreadArgs* targs = (UncoreThreadArgs*) args;
-    targs->uncore_manager->msgHandler(targs->tid);
+    UncoreManager* uncore_manager = (UncoreManager*) args;
+    uncore_manager->msgProducer();
     return NULL;
 }
 
-void UncoreManager::init(const XmlSim* xml_sim, const char* result_basename)
+// Handle receiving MPI messages and send back responses
+void *msgConsumerWrapper(void *args)
 {
-    sys.init(&xml_sim->sys);
-    thread_sched.init(sys.getCoreCount());
+    HandlerArgs* targs = (HandlerArgs*) args;
+    targs->uncore_manager->msgConsumer(targs->tid);
+    return NULL;
+}
+
+void UncoreManager::init(const XmlSim* xml_sim)
+{
+    simulation_finished = false;
+    sys = new System;
+    assert(sys != NULL);
+    sys->init(&xml_sim->sys);
+    thread_sched = new ThreadSched;
+    assert(thread_sched != NULL);
+    thread_sched->init(getCoreCount());
+
     max_msg_size = xml_sim->max_msg_size;
     num_threads = xml_sim->num_recv_threads;
-    assert(num_threads <= THREAD_MAX);
+    assert(num_threads <= UNCORE_THREAD_MAX);
 
     pthread_mutex_init(&mutex, NULL);
+
+    handler_data = new HandlerData[num_threads];
+    assert(handler_data);
     for (int i = 0; i < num_threads; i++) {
-        thread_data[i].init(this, max_msg_size, i);
+        handler_data[i].init(this, i);
+    }
+
+    core_data = new CoreData[getCoreCount()];
+    assert(core_data);
+    for (int i = 0; i < getCoreCount(); i++) {
+        core_data[i].init(max_msg_size);
     }
 
     int rank, rc;
-    rc = MPI_Comm_dup(MPI_COMM_WORLD, &comm);
+    rc = MPI_Comm_dup(MPI_COMM_WORLD, &comm);    
     if (rc != MPI_SUCCESS) {
         cerr << "Error duplicating world communicator. Terminating." << endl;
         MPI_Abort(MPI_COMM_WORLD, rc);
@@ -72,16 +95,15 @@ void UncoreManager::init(const XmlSim* xml_sim, const char* result_basename)
     if (rc != MPI_SUCCESS) {
         cerr << "Process not in new comm. Terminating." << endl;
         MPI_Abort(MPI_COMM_WORLD, rc);
-    }
+    }    
 
-    stringstream result_filename;
-    result_filename << result_basename << "_" << rank;
-    result_ofstream.open(result_filename.str().c_str());
-
+    proc_list = new std::list<int>;
     // Match call to createCommWithoutUncore here with same call in core_manager, 
     // otherwise process will hang forever
     MPI_Comm   barrier_comm;
     createCommWithoutUncore(comm, &barrier_comm);
+
+
 }
 
 
@@ -96,31 +118,36 @@ void UncoreManager::getSimFinishTime()
 }
 
 
-int UncoreManager::allocCore(int prog_id, int thread_id)
+int UncoreManager::allocCore(int pid, int tid)
 {
-    return thread_sched.allocCore(prog_id, thread_id);
+    return thread_sched->allocCore(pid, tid);
 }
 
 
-int UncoreManager::deallocCore(int prog_id, int thread_id)
+int UncoreManager::deallocCore(int pid, int tid)
 {
-    return thread_sched.deallocCore(prog_id, thread_id);
+    return thread_sched->deallocCore(pid, tid);
 }
 
 
-int UncoreManager::getCoreId(int prog_id, int thread_id)
+int UncoreManager::getCoreId(int pid, int tid)
 {
-    return thread_sched.getCoreId(prog_id, thread_id);
+    return thread_sched->getCoreId(pid, tid);
 }
 
 //Access the uncore system
 int UncoreManager::uncore_access(int core_id, InsMem* ins_mem, int64_t timer)
 {
-    return sys.access(core_id, ins_mem, timer);
+    return sys->access(core_id, ins_mem, timer);
 }
 
-void UncoreManager::report()
+void UncoreManager::report(const char* result_basename)
 {
+    string result_filename(result_basename);
+    result_filename = result_filename + "_0";   
+    ofstream result_ofstream;
+    result_ofstream.open(result_filename.c_str());
+
     result_ofstream << "*********************************************************\n";
     result_ofstream << "*                   PriME Simulator                     *\n";
     result_ofstream << "*********************************************************\n\n";
@@ -128,8 +155,10 @@ void UncoreManager::report()
     result_ofstream << "Total computation time: " << sim_time <<" seconds\n";
     result_ofstream<<endl;
     
-    thread_sched.report(result_ofstream);
-    sys.report(result_ofstream);
+    thread_sched->report(result_ofstream);
+    sys->report(result_ofstream);
+
+    result_ofstream.close();
 }
 
 void UncoreManager::lock() 
@@ -142,135 +171,145 @@ void UncoreManager::unlock()
     pthread_mutex_unlock(&mutex);
 }
 
-void UncoreManager::add_proc(int proc_id) 
+void UncoreManager::add_proc(int pid) 
 {
-    proc_list.push_back(proc_id);
-    proc_list.unique();      
+    proc_list->push_back(pid);
+    proc_list->unique();      
 }
 
-void UncoreManager::rm_proc(int proc_id) 
+void UncoreManager::rm_proc(int pid) 
 {
-    proc_list.remove(proc_id);
+    proc_list->remove(pid);
 }
 
-int UncoreManager::get_num_threads() {
+int UncoreManager::getNumThreads() {
     return num_threads;
-}
-
-int UncoreManager::get_max_msg_size() {
-    return max_msg_size;
 }
 
 UncoreManager::~UncoreManager()
 {
-    result_ofstream.close();
     pthread_mutex_destroy(&mutex);
+    delete proc_list;
+    delete [] handler_data;
+    delete [] core_data;
+    delete sys;
+    delete thread_sched;
 }     
 
-
-void UncoreManager::msgHandler(int my_tid)
-{
-    while (1) {
-        MPI_Status local_status;
-        UncoreThreadData& tdata = thread_data[my_tid];
-        MPIMsg& msg = tdata.msgs[0];
-        MPI_Recv(tdata.msgs, (max_msg_size + 1)*sizeof(MPIMsg), MPI_CHAR, MPI_ANY_SOURCE, my_tid , comm, &local_status);
-        int src_proc_id = local_status.MPI_SOURCE;
-        lock();
+void UncoreManager::msgProducer() {
+    MPIMsg* inbuffer = new MPIMsg[max_msg_size + 1];
+    assert(inbuffer != NULL);
+    auto& msg = inbuffer[0];
+    
+    while(1) {
+        MPI_Recv(inbuffer, (max_msg_size+1) * sizeof(MPIMsg), MPI_CHAR, MPI_ANY_SOURCE, 0, comm, MPI_STATUS_IGNORE);
+        int src_pid = msg.pid;
+        int src_tid = msg.tid;
 
         switch (msg.message_type) {
             case PROCESS_STARTING: {//Receive a msg indicating a new process
-                cout<<"[PriME] Pin process "<<src_proc_id<<" begins"<<endl;
-                add_proc(src_proc_id);
-                unlock();
-                break;
-            }
-            case PROCESS_FINISHING: {//Receive a msg indicating a process has finished
-                cout<<"[PriME] Pin process "<<src_proc_id<<" finishes"<<endl;
-                rm_proc(src_proc_id);
-                int proc_num = proc_list.size();
-                MPI_Send(&proc_num, 1, MPI_INT, src_proc_id , 0, comm);
-                
-                if (barrier_proc_count >= proc_num) {                    
-                    for(auto proc_id : proc_list) {
-                        MPI_Send(&proc_num, 1, MPI_INT, proc_id, 0, comm);
-                    }
-                    barrier_proc_count = 0; 
-                }
-                unlock();
-                break;
-            }
-            case INTER_PROCESS_BARRIERS: {//Receive a msg for inter-process barriers
-                cout<<"[PriME] Pin process "<<src_proc_id<<" meets a barrier"<<endl;
-                barrier_proc_count++;
-                if (barrier_proc_count >= proc_list.size()) {
-                    int proc_num = proc_list.size();
-                    for(auto proc_id : proc_list) {
-                        MPI_Send(&proc_num, 1, MPI_INT, proc_id, 0, comm);
-                    }
-                    barrier_proc_count = 0; 
-                } 
+                lock();
+                cout<<"[PriME] Pin process "<<src_pid<<" begins"<<endl;
+                add_proc(src_pid);
                 unlock();
                 break;
             }
             case NEW_THREAD: {//Receive a msg indicating a new thread
-                int core_id = allocCore(src_proc_id, msg.thread_id);   
+                lock();
+                int core_id = allocCore(src_pid, src_tid);   
                 if (core_id == -1) {
-                    cerr<< "Not enough cores for process "<<src_proc_id<<" thread "<<msg.mem_size<<endl;
-                    report();
+                    cerr<< "Not enough cores for process "<<src_pid<<" thread "<<msg.mem_size<<endl;
                     unlock();
                     MPI_Abort(MPI_COMM_WORLD, -1);
                 } 
-                else {
-                    int uncore_thread = core_id % get_num_threads();
-                    MPI_Send(&uncore_thread, 1, MPI_INT, src_proc_id, msg.thread_id, comm);
-                    unlock();
-                }
-                break;
-            }
-            case THREAD_FINISHING: {//Receive a msg indicating a thread is finishing
-                deallocCore(src_proc_id, msg.thread_id);   
+                core_data[core_id].init(max_msg_size);
                 unlock();
                 break;
             }
-            case PROGRAM_EXITING: { //Receive a msg to terminate the execution
+            default: {
+                lock();
+                int core_id = getCoreId(src_pid, src_tid);
                 unlock();
-                pthread_exit(NULL);
+                auto& cdata = core_data[core_id];
+                cdata.insert_msg(inbuffer, msg.payload_len);
                 break;
             }
-            case MEM_REQUESTS: {//Receive a msg of memory requests
-                int thread_id = msg.thread_id;
-                int msg_len = msg.payload_len;
-                int core_id = getCoreId(src_proc_id, thread_id);
-                cout<<"[PriME] Pin thread " << thread_id << " from process "
-                    <<src_proc_id<<" makes "<<msg_len-1<<" memory requests "<<endl;
-                unlock();
-                int delay = 0;
-                InsMem ins_mem;
-                memset(&ins_mem, 0, sizeof(ins_mem));
+        }
+    }
+}
 
-                
-                ins_mem.prog_id = src_proc_id;
-                for(int i = 1; i < msg_len; i++) {
-                    ins_mem.mem_type = tdata.msgs[i].mem_type;
-                    ins_mem.addr_dmem = tdata.msgs[i].addr_dmem;
-                    delay += uncore_access(core_id, &ins_mem, tdata.msgs[i].timer + delay) - 1;
-                    
-                    if (delay < 0) {
-                        cerr<<"Error: negative delay: "<<core_id<<" "<<ins_mem.prog_id<<" "<<thread_id<<" "
-                            <<ins_mem.mem_type<<" "<<ins_mem.addr_dmem<<endl;
-                        MPI_Abort(MPI_COMM_WORLD, -1);
+void UncoreManager::msgConsumer(int my_tid) {
+    MPIMsg* inbuffer = new MPIMsg[max_msg_size + 1];
+    assert(inbuffer != NULL);
+    auto& msg = inbuffer[0];
+
+    while (1) {
+        for (int cid = 0; cid < getCoreCount(); cid++) {
+            if (cid % getNumThreads() != my_tid)
+                continue;
+
+            auto& cdata = core_data[cid];
+            if (!cdata.valid)
+                continue;
+            if (!cdata.eject_msg(inbuffer))
+                continue;
+
+            int src_pid = msg.pid;
+            int src_tid = msg.tid;
+
+            switch (msg.message_type) {
+                case PROCESS_FINISHING: {//Receive a msg indicating a process has finished
+                    lock();
+                    cout<<"[PriME] Pin process "<<src_pid<<" finishes"<<endl;
+                    rm_proc(src_pid);
+                    if (proc_list->empty()) {
+                        simulation_finished = true;
                     }
+                    unlock();
+                    break;
                 }
-                MPI_Send(&delay, 1, MPI_INT, src_proc_id , thread_id, comm);
-                break;
-            }
-            default:{
-                cerr<< "Wrong message type "<<msg.message_type<<endl;
-                unlock();
-                report();
-                MPI_Abort(MPI_COMM_WORLD, -1);
-            }
+                case THREAD_FINISHING: {//Receive a msg indicating a thread is finishing
+                    lock();
+                    deallocCore(src_pid, src_tid);   
+                    unlock();
+                    break;
+                }
+                case MEM_REQUESTS: {//Receive a msg of memory requests
+                    int msg_len = msg.payload_len;
+                    lock();
+                    int core_id = getCoreId(src_pid, src_tid);
+                    cout<<"[PriME] Pin thread " << src_tid << " from process "
+                        <<src_pid<<" makes "<<msg_len-1<<" memory requests "<<endl;
+                    unlock();
+                    int delay = 0;
+                    InsMem ins_mem;
+                    memset(&ins_mem, 0, sizeof(ins_mem));
+
+                    ins_mem.pid = src_pid;
+                    for(int i = 1; i < msg_len; i++) {
+                        ins_mem.mem_type = inbuffer[i].mem_type;
+                        ins_mem.addr_dmem = inbuffer[i].addr_dmem;
+                        delay += uncore_access(core_id, &ins_mem, inbuffer[i].timer + delay) - 1;
+                        
+                        if (delay < 0) {
+                            cerr<<"Error: negative delay: "<<core_id<<" "<<ins_mem.pid<<" "<<src_tid<<" "
+                                <<ins_mem.mem_type<<" "<<ins_mem.addr_dmem<<endl;
+                            MPI_Abort(MPI_COMM_WORLD, -1);
+                        }
+                    }
+                    MPI_Send(&delay, 1, MPI_INT, src_pid , src_tid, comm);
+                    break;
+                }
+                default:{
+                    cerr<< "Wrong message type "<<msg.message_type<<endl;
+                    MPI_Abort(MPI_COMM_WORLD, -1);
+                }
+            }            
+        }
+
+        if (simulation_finished) {
+            delete [] inbuffer;
+            pthread_exit(NULL);
         }
     }
 }
@@ -284,8 +323,7 @@ void UncoreManager::spawn_threads()
     getSimStartTime();
     for(int t = 0; t < num_threads; t++) {
         cout << "[PriME] Main: creating uncore thread " << t <<endl;
-        typedef void * (*THREADFUNCPTR)(void *);
-        int rc = pthread_create(&thread_data[t].handle, &attr, msgHandlerWrapper, (void *)(&thread_data[t].args)); 
+        int rc = pthread_create(&handler_data[t].handle, &attr, msgConsumerWrapper, (void *)(&handler_data[t].args)); 
         
         if (rc) {
             cerr << "Error return code from pthread_create(): " << rc << endl;
@@ -294,23 +332,43 @@ void UncoreManager::spawn_threads()
         }
     }
 
+    int rc = pthread_create(&producer_thread_handle, &attr, msgProducerWrapper, (void *)(this)); 
+    if (rc) {
+        cerr << "Error return code from pthread_create(): " << rc << endl;
+        MPI_Finalize();
+        exit(-1);
+    }    
+
     // Free attribute 
     pthread_attr_destroy(&attr);
 }
 
 void UncoreManager::collect_threads() 
 {
+    void *status;
     for(long t = 0; t < num_threads; t++) { 
-        void *status;
-        int rc = pthread_join(thread_data[t].handle, &status);
+        int rc = pthread_join(handler_data[t].handle, &status);
         if (rc) {
             cerr << "Error return code from pthread_join(): " << rc << endl;
             MPI_Finalize();
             exit(-1);
-       }
-       cout << "[PriME] Main: completed join with uncore thread " << t << " having a status of "<< status << endl;
+        }
+        cout << "[PriME] Main: completed join with uncore thread " << t << " having a status of "<< status << endl;
     }
+
+    int rc = pthread_cancel(producer_thread_handle);
+    if (rc) {
+        cerr << "Error return code from pthread_join(): " << rc << endl;
+        MPI_Finalize();
+        exit(-1);
+    }
+    cout << "[PriME] Main: completed join with uncore thread producer" << endl;
+
     getSimFinishTime();
 }
 
+int UncoreManager::getCoreCount()
+{
+    return sys->getCoreCount();
+}
 

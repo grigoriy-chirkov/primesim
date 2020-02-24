@@ -46,75 +46,125 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "mpi.h"
 
-#define THREAD_MAX 32
-
-
+#define BUF_SIZE 10
 
 class UncoreManager;
 
-struct UncoreThreadArgs {
+struct HandlerArgs {
     UncoreManager* uncore_manager;
     int tid;
 };
 
 
-struct UncoreThreadData {
+struct HandlerData {
     pthread_t handle;
-    MPIMsg* msgs = NULL;
-    UncoreThreadArgs args;
+    HandlerArgs args;
 
-    void init(UncoreManager* uncore_manager, int max_msg_size, int tid) {
-        msgs = new MPIMsg[max_msg_size + 1];
-        assert(msgs != NULL);
-        memset(msgs, 0, (max_msg_size + 1)*sizeof(MPIMsg));
+    void init(UncoreManager* uncore_manager, int tid) {
         args.uncore_manager = uncore_manager;
         args.tid = tid;
     }
+};
 
-    ~UncoreThreadData() {
-        if (msgs != NULL) {
-            delete [] msgs;
+struct CoreData {
+    MPIMsg* msgs[BUF_SIZE];
+    pthread_mutex_t mutex; // needed to add/remove data from the buffer
+    pthread_cond_t can_produce; // signaled when items are removed
+    int len;
+    bool valid = false;
+    uint64_t cycle;
+
+    void init(int max_msg_size) {
+        for (int i = 0; i < BUF_SIZE; i++) {
+            msgs[i] = new MPIMsg[max_msg_size + 1];
+            memset(msgs[i], 0, (max_msg_size + 1)*sizeof(MPIMsg));
+            assert(msgs[i] != NULL);
         }
+        valid = true;
+    };
+
+    ~CoreData() {
+        if (valid) {
+            for (int i = 0; i < BUF_SIZE; i++) {
+                delete[] msgs[i];
+            }
+        }
+
+    }
+
+    void insert_msg(MPIMsg* inbuffer, size_t num) {
+        lock();
+        if(len == BUF_SIZE) { // full
+        // wait until some elements are consumed
+            pthread_cond_wait(&can_produce, &mutex);
+        }
+        memcpy(msgs[len], inbuffer, sizeof(MPIMsg)*num);
+        len++;
+        unlock();
+    }
+
+    bool eject_msg(MPIMsg* outbuffer) {
+        lock();
+        if (len == 0) {
+            unlock();
+            return false;
+        }
+
+        len--;
+        memcpy(outbuffer, msgs[len], sizeof(MPIMsg)*msgs[len][0].payload_len);
+        unlock();
+        return true;
+    }
+
+    void lock() {
+        pthread_mutex_lock(&mutex);
+    }
+
+    void unlock() {
+        pthread_mutex_unlock(&mutex);
     }
 };
 
 class UncoreManager
 {
 public:
-    void init(const XmlSim* xml_sim, const char* result_basename);
-
-    void report();
-    void msgHandler(int my_tid); 
+    void init(const XmlSim* xml_sim);
+    void report(const char* result_basename);
+    void msgProducer();
+    void msgConsumer(int );
     void spawn_threads();  
     void collect_threads();      
     ~UncoreManager();
 private:
+    System* sys;
+    ThreadSched* thread_sched;
+    HandlerData* handler_data;
+    CoreData* core_data;
+    std::list<int>* proc_list;
+    pthread_t producer_thread_handle;
+    pthread_t producer_thread_handle1;
+
     struct timespec sim_start_time;
     struct timespec sim_finish_time;
-    System sys;
-    ThreadSched thread_sched;
-    ofstream result_ofstream;
+
     pthread_mutex_t mutex;
     int max_msg_size;
     int num_threads;
     MPI_Comm   comm;
-    UncoreThreadData thread_data[THREAD_MAX];
+    bool simulation_finished;
 
     void lock();
     void unlock();
-    void add_proc(int proc_id);
-    void rm_proc(int proc_id) ;
-    int get_num_threads();
-    int get_max_msg_size();
-    int allocCore(int prog_id, int thread_id);
-    int deallocCore(int prog_id, int thread_id);
-    int getCoreId(int prog_id, int thread_id);
+    void add_proc(int pid);
+    void rm_proc(int pid) ;
+    int getNumThreads();
+    int allocCore(int pid, int tid);
+    int deallocCore(int pid, int tid);
+    int getCoreId(int pid, int tid);
+    int getCoreCount();
     int uncore_access(int core_id, InsMem* ins_mem, int64_t timer);
     void getSimStartTime();
     void getSimFinishTime();
-public:
-    std::list<int> proc_list;
-    int barrier_proc_count = 0;
 };
 
 

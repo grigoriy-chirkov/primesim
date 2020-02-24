@@ -58,9 +58,9 @@ uint64_t PageTable::translate(InsMem* ins_mem)
     uint64_t ppage_num;
     PageMap::iterator it;
     pthread_mutex_lock(lock);
-    it = page_map.find(UKey(ins_mem->prog_id, getPageId(ins_mem->addr_dmem)));
+    it = page_map.find(UKey(ins_mem->pid, getPageId(ins_mem->addr_dmem)));
     if(it == page_map.end()) {
-        page_map[UKey(ins_mem->prog_id, getPageId(ins_mem->addr_dmem))] = empty_page_num;
+        page_map[UKey(ins_mem->pid, getPageId(ins_mem->addr_dmem))] = empty_page_num;
         ppage_num = empty_page_num;
         empty_page_num++;
     }

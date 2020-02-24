@@ -52,8 +52,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "xml_parser.h"
 #include "common.h"
 
-#define THREAD_MAX  1024 // Maximum number of threads in one process
-
 //For futex syscalls
 typedef struct SysFutex
 {
@@ -72,7 +70,6 @@ class CoreManager
         double ins_count;
         MPIMsg   *msgs;
         int delay;
-        int uncore_thread;
         int mpi_pos;
         int thread_state;
         SysFutex sys_wake;
@@ -84,7 +81,6 @@ class CoreManager
             memset(msgs, 0, (max_msg_size + 1) * sizeof(MPIMsg));
             thread_state = DEAD;
             core_thread = -1;
-            uncore_thread = 0;
             mpi_pos = 1;
             memset(&sys_wake, 0, sizeof(sys_wake));
             memset(&sys_wait, 0, sizeof(sys_wait));
@@ -121,9 +117,8 @@ class CoreManager
         void barrier(THREADID threadid);
         struct timespec sim_start_time;
         struct timespec sim_finish_time;
-        ThreadData thread_data[THREAD_MAX];
+        ThreadData thread_data[CORE_THREAD_MAX];
         int num_threads_online;
-        int num_procs;
         int max_threads;
         int barrier_counter;
         uint64_t barrier_time;

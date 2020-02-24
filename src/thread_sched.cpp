@@ -52,14 +52,14 @@ void ThreadSched::init(int num_cores_in)
 
 
 //Allocate a core for a thread
-int ThreadSched::allocCore(int prog_id, int thread_id)
+int ThreadSched::allocCore(int pid, int tid)
 {
     for(int i = 0; i < num_cores; i++)
     {
         if(core_stat[i] == 0)
         {
-            core_stat[i] = prog_id;
-            core_map[Key(prog_id, thread_id)] =  i;
+            core_stat[i] = pid;
+            core_map[Key(pid, tid)] =  i;
             return i;
         }
     }
@@ -68,15 +68,15 @@ int ThreadSched::allocCore(int prog_id, int thread_id)
 
 
 //Return the core id for the allocated thread
-int ThreadSched::getCoreId(int prog_id, int thread_id)
+int ThreadSched::getCoreId(int pid, int tid)
 {
-    return core_map[Key(prog_id, thread_id)];
+    return core_map[Key(pid, tid)];
 }
 
 //De-allocate core for the thread
-int ThreadSched::deallocCore(int prog_id, int thread_id)
+int ThreadSched::deallocCore(int pid, int tid)
 {
-    int core_id = core_map[Key(prog_id, thread_id)];
+    int core_id = core_map[Key(pid, tid)];
     if ((core_id >= 0) && (core_stat[core_id] == 1)) {
         core_stat[core_id] = 0;
         return 1;
@@ -86,13 +86,13 @@ int ThreadSched::deallocCore(int prog_id, int thread_id)
     }
 }
 
-int ThreadSched::getThreadCount(int prog_id) 
+int ThreadSched::getThreadCount(int pid) 
 {
     int thread_count = 0;
     CoreMap::iterator pos;
     for (pos = core_map.begin(); pos != core_map.end(); ++pos)
     {
-        if(pos->first.first == prog_id)
+        if(pos->first.first == pid)
         {
             thread_count++;
         }

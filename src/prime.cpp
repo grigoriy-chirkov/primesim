@@ -80,11 +80,12 @@ int main(int argc, char *argv[])
     }
     const XmlSim* xml_sim = xml_parser.getXmlSim();
 
-    UncoreManager uncore_manager;
-    uncore_manager.init(xml_sim, argv[2]);
-    uncore_manager.spawn_threads();
-    uncore_manager.collect_threads();
-    uncore_manager.report();
+    UncoreManager* uncore_manager = new UncoreManager;
+    uncore_manager->init(xml_sim);
+    uncore_manager->spawn_threads();
+    uncore_manager->collect_threads();
+    uncore_manager->report(argv[2]);
+    delete uncore_manager;
 
     MPI_Finalize();
 }

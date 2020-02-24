@@ -93,9 +93,9 @@ typedef map<int, Line*> LineMap;
 typedef struct InsMem
 {
     char        mem_type; // 2 means writeback, 1 means write, 0 means read
-    int         prog_id;
-    int         thread_id;
-    int         rec_thread_id;
+    int         pid;
+    int         tid;
+    int         rec_tid;
     uint64_t    addr_dmem; 
 } InsMem;
 
