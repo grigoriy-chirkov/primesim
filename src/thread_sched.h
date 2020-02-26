@@ -51,6 +51,7 @@ class ThreadSched
         int allocCore(int pid, int tid);
         int deallocCore(int pid, int tid);
         int getCoreId(int pid, int tid);
+        int getProcId(int cid);
         int getThreadCount(int pid);
         void report(ofstream& result);
         ~ThreadSched();        

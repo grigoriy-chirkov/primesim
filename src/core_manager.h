@@ -52,49 +52,31 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "xml_parser.h"
 #include "common.h"
 
-//For futex syscalls
-typedef struct SysFutex
-{
-    bool valid;
-    int  count;
-    uint64_t addr;
-    uint64_t time;
-} SysFutex;
-
-
 class CoreManager
 {
     struct ThreadData {
-        double cycle;
-        double ins_nonmem;
-        double ins_count;
-        MPIMsg   *msgs;
-        int delay;
-        int mpi_pos;
-        int thread_state;
-        SysFutex sys_wake;
-        SysFutex sys_wait;
-        uint32_t  core_thread;
+        uint64_t ins_nonmem;
+        MPIMsg   *msgs = NULL;
+        int mpi_pos = 1;
+        ThreadState thread_state = DEAD;
+        bool valid = false;
 
         void init(int max_msg_size) {
+            valid = true;
+            thread_state = ACTIVE;
             msgs = new MPIMsg [max_msg_size + 1];
+            assert(msgs != NULL);
             memset(msgs, 0, (max_msg_size + 1) * sizeof(MPIMsg));
-            thread_state = DEAD;
-            core_thread = -1;
-            mpi_pos = 1;
-            memset(&sys_wake, 0, sizeof(sys_wake));
-            memset(&sys_wait, 0, sizeof(sys_wait));
         };
 
         ~ThreadData() {
-            delete[] msgs;
+            if (valid)
+                delete[] msgs;
         };
     } __attribute__ ((aligned (64)));
 
     public:
         void init(XmlSim* xml_sim, MPI_Comm _comm);
-        void getSimStartTime();
-        void getSimFinishTime();
         void startSim();
         void finishSim(int32_t code, void *v);
         void execNonMem(uint32_t ins_count_in, THREADID threadid);
@@ -103,40 +85,17 @@ class CoreManager
         void threadFini(THREADID threadid, const CONTEXT *ctxt, int32_t code, void *v);
         void syscallEntry(THREADID threadIndex, CONTEXT *ctxt, SYSCALL_STANDARD std, void *v);
         void syscallExit(THREADID threadIndex, CONTEXT *ctxt, SYSCALL_STANDARD std, void *v);
-        void report(ofstream& result);
-        int getRank();
-        void insCount(uint32_t ins_count_in, THREADID threadid);
         ~CoreManager();        
     private:
         void drainMemReqs(THREADID threadid);
-        bool isOtherThreadWaiting(THREADID threadid);
         void sysBefore(ADDRINT ip, ADDRINT num, ADDRINT arg0, ADDRINT arg1, ADDRINT arg2, 
                ADDRINT arg3, ADDRINT arg4, ADDRINT arg5, THREADID threadid);
         void sysAfter(ADDRINT ret, THREADID threadid);
-        double getAvgCycle();
-        void barrier(THREADID threadid);
-        struct timespec sim_start_time;
-        struct timespec sim_finish_time;
         ThreadData thread_data[CORE_THREAD_MAX];
-        int num_threads_online;
-        int max_threads;
-        int barrier_counter;
-        uint64_t barrier_time;
-        double cpi_nonmem;
-        double freq;
         int syscall_count;
-        int sync_syscall_count;
         int max_msg_size;
-        uint64_t thread_sync_interval;
-        uint64_t proc_sync_interval;
-        uint64_t syscall_cost;
-        int num_recv_threads;
-        PIN_LOCK thread_lock;
-        PIN_MUTEX mutex;
-        PIN_SEMAPHORE sem;
-        int rank;
+        int pid;
         MPI_Comm comm;
-
 };
 
 

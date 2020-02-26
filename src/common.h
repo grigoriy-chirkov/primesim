@@ -34,34 +34,32 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "mpi.h"
 
 
-
-
-enum MessageTypes
+enum MessageType
 {
     MEM_REQUESTS = 0,
     PROCESS_STARTING = -3,
     PROCESS_FINISHING = -1,
-    INTER_PROCESS_BARRIERS = -2,
     NEW_THREAD = -4,
     THREAD_FINISHING = -8,
-    PROGRAM_EXITING = -5
+    PROGRAM_EXITING = -5,
+    THREAD_LOCK = -6,
+    THREAD_UNLOCK = -7
 };
 
 struct MPIMsg
 {
+    bool is_control; 
     union {
-        struct {
-            uint64_t     message_type;
-            uint64_t     tid;
-            uint64_t     pid;
+        struct { // control msg
+            MessageType  message_type;
+            int          tid;
+            int          pid;
             uint64_t     payload_len;
         };
-        struct {
+        struct { // mem msg
             bool        mem_type; //1 means write, 0 means read
-            int         mem_size; 
             uint64_t    addr_dmem; 
-            int64_t     timer;
-
+            uint64_t    ins_before;
         };
     };
 };
@@ -77,7 +75,7 @@ enum ThreadState
 {
     DEAD    = 0,
     ACTIVE  = 1,
-    SUSPEND = 2,
+    LOCKED  = 2,
     FINISH  = 3,
     WAIT    = 4
 };
@@ -107,7 +105,6 @@ static void createCommWithoutUncore(MPI_Comm comm, MPI_Comm* barrier_comm) {
     }
 }
 
-#define UNCORE_THREAD_MAX 32
 #define CORE_THREAD_MAX 1024
 
 

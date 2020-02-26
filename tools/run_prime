@@ -41,6 +41,8 @@ import time
 
 
 def run_prime(config_path, output_path, progs):
+    config_path = os.path.abspath(config_path)
+    output_path = os.path.abspath(output_path)
     timestr = time.strftime("%Y%m%d")
     cmd_num = 1
     
@@ -50,70 +52,31 @@ def run_prime(config_path, output_path, progs):
     f = open(cmd_path, 'w')
     f.write('#!/bin/bash\n')
 
-    parsec = False
-    for prog in progs:
-        prog_split = prog.split(',')
-        if len(prog_split) == 3:
-            parsec = True
-        elif len(prog_split) != 1:
-            sys.exit("Incorrect argument format")
-    
-    if parsec is True:  
-        f.write('cd ' + parsec_path + '\n\n')
-        f.write('source env.sh\n')
-
     config_path_prime = os.path.splitext(config_path)[0] + "_prime.xml"
-    f.write('mpiexec --verbose -np 1 --bind-to none  '
+    f.write('mpiexec --verbose --bind-to none -np 1 '
             +prime_path+'/bin/prime ' + config_path_prime + ' ' +output_path)
 
     config_path_pin = os.path.splitext(config_path)[0] + "_pin.xml"
     for prog in progs:
-        prog_split = prog.split(',')
-        if len(prog_split) == 3:  
-            # 0 thread indicates serial execution
-            if int(prog_split[1]) == 0:
-                f.write(' : -np 1 parsecmgmt -a run -p '+prog_split[0]+' -i '+prog_split[2]+' -c gcc-serial -s "'+
-                        'pin -ifeellucky -t '+prime_path+'/bin/prime.so -c '+ config_path_pin + ' -o ' + output_path + ' --"')
-            else:
-                if(prog_split[0] is 'freqmine'):
-                    f.write(' : -np 1 parsecmgmt -a run -p '+prog_split[0]+' -i '+prog_split[2]+' -n '+str(prog_split[1])+' -c gcc-openmp -s "'+
-                            'pin -ifeellucky -t '+prime_path+'/bin/prime.so -c ' + config_path_pin + ' -o ' + output_path + ' --"')
-                else:
-                    f.write(' : -np 1 parsecmgmt -a run -p '+prog_split[0]+' -i '+prog_split[2]+' -n '+str(prog_split[1])+' -c gcc-pthreads -s "'+
-                            'pin -ifeellucky -t '+prime_path+'/bin/prime.so -c ' + config_path_pin +' -o ' + output_path + ' --"')
-        else:
-            f.write(' : -np 1 pin -ifeellucky -t '+prime_path+'/bin/prime.so -c ' + config_path_pin +' -o ' + output_path + ' -- ' + prog)
+        f.write(' : -np 1 pin -ifeellucky -t '+prime_path+'/bin/prime.so -c ' + config_path_pin +' -o ' + output_path + ' -- ' + prog)
+
     f.write('\n')
-    f.write('cat ')
-    for i in range(1, len(progs) + 1): 
-        f.write(output_path + '_' + str(i) + ' ')
-    f.write(output_path + '_0 ')
-    f.write('> ' + output_path)
-    f.write('\n')
-    for i in range(len(progs) + 1): 
-        f.write('rm -f ' + output_path + '_' + str(i) + '\n')
     f.close()
     os.system('chmod +x ' + cmd_path)
     os.system(cmd_path)
 
 
-parsec_path = os.environ.get('PARSEC_PATH')
 prime_path  = os.environ.get('PRIME_PATH') 
 
 def main():
    usage = '''
    run_prime [options] prog1 prog2 ...
-   run_prime [options] prog1,thread_count1,input_size1 prog2,thread_count2,input_size2 ...
-   run_prime [options] prog1,thread_count1,input_size1 prog2 ...
-   Note: the format of prog,thread_count,input_size only works for PARSEC benchmarks
-   E.g. run_prime ls blackscholes,1,simsmall'''
+   '''
+   
    parser = OptionParser(usage=usage)
    parser.add_option("-c", "--config_path",
                       dest="config_path", default=prime_path + "/xml/config.xml",
                       metavar="CONFIG_PATH", help="use CONFIG_PATH to configure the simulated system, the default configuration path is xml/config.xml")
-   parser.add_option("-r", "--config_and_run",
-                      action="store_true", dest="config_and_run", default=False,
-                      help="generate the config file and run PriME")
    parser.add_option("-o", "--output_path",
                       dest="output_path", default=prime_path + "/output/config.out",
                       metavar="OUTPUT_PATH", help="write the report to OUTPUT_PATH, the default output path is output/config.out")
@@ -121,8 +84,6 @@ def main():
    (options, args) = parser.parse_args()
    if len(args) < 1:
         parser.error("Incorrect number of arguments")
-   if options.config_and_run: 
-        os.system('config_prime -o ' + options.config_path) 
    run_prime(options.config_path, options.output_path, args)
 
 

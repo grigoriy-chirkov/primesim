@@ -55,11 +55,7 @@ KNOB<string> KnobOutputFile(KNOB_MODE_WRITEONCE, "pintool",
 KNOB<string> KnobConfigFile(KNOB_MODE_WRITEONCE, "pintool",
     "c", "config.xml", "specify config file name");
 
-// This function is called before every instruction is executed to calculate the instruction count
-void PIN_FAST_ANALYSIS_CALL insCount(uint32_t ins_count, THREADID threadid)
-{
-    core_manager->insCount(ins_count, threadid);
-}
+
 
 // Handle non-memory instructions
 void PIN_FAST_ANALYSIS_CALL execNonMem(uint32_t ins_count, THREADID threadid)
@@ -107,10 +103,6 @@ void Trace(TRACE trace, void *v)
 
     // Visit every basic block  in the trace
     for (BBL bbl = TRACE_BblHead(trace); BBL_Valid(bbl); bbl = BBL_Next(bbl)) {
-
-        // Insert a call to insCount before every bbl, passing the number of instructions
-        BBL_InsertCall(bbl, IPOINT_BEFORE, (AFUNPTR)insCount, IARG_FAST_ANALYSIS_CALL, 
-                       IARG_UINT32, BBL_NumIns(bbl), IARG_THREAD_ID, IARG_END);
 
         nonmem_count = 0;
         INS ins = BBL_InsHead(bbl);
@@ -172,14 +164,6 @@ void Start(void *v)
 
 void Fini(int32_t code, void *v)
 {
-    core_manager->getSimFinishTime();
-    stringstream ss_rank;
-    ss_rank << core_manager->getRank();
-    ofstream result;
-    result.open((KnobOutputFile.Value() + "_" + ss_rank.str()).c_str());
-    //Report results
-    core_manager->report(result);
-    result.close();
     core_manager->finishSim(code, v);
     delete core_manager;
 }
@@ -237,7 +221,6 @@ int main(int argc, char *argv[])
 
     core_manager = new CoreManager;
     core_manager->init(xml_sim, prime_comm);
-    core_manager->getSimStartTime();
 
  
     // Register Instruction to be called to instrument instructions

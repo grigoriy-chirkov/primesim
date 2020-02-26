@@ -1104,7 +1104,7 @@ void System::report(ofstream& result_ofstream)
         result_ofstream << "=================================================================\n\n";
         
         if (verbose_report) {
-            page_table.report(result_ofstream);
+           // page_table.report(result_ofstream);
         }
     } 
 

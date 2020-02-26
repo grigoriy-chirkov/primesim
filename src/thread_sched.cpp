@@ -73,6 +73,12 @@ int ThreadSched::getCoreId(int pid, int tid)
     return core_map[Key(pid, tid)];
 }
 
+//Return the core id for the allocated thread
+int ThreadSched::getProcId(int cid)
+{
+    return core_stat[cid];
+}
+
 //De-allocate core for the thread
 int ThreadSched::deallocCore(int pid, int tid)
 {

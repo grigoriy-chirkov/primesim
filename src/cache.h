@@ -90,14 +90,14 @@ typedef struct Line
 
 typedef map<int, Line*> LineMap;
 
-typedef struct InsMem
+struct InsMem
 {
     char        mem_type; // 2 means writeback, 1 means write, 0 means read
     int         pid;
     int         tid;
     int         rec_tid;
     uint64_t    addr_dmem; 
-} InsMem;
+};
 
 
 class Cache
