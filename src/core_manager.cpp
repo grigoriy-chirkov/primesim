@@ -45,6 +45,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 using namespace std;
 
+// ostream& operator<<(ostream& out, const MPIMsg& msg) {
+//     out << msg.is_control << " " << msg.message_type << endl;
+//     return out;
+// }
 
 void CoreManager::init(XmlSim* xml_sim, MPI_Comm _comm)
 {
@@ -60,22 +64,29 @@ void CoreManager::init(XmlSim* xml_sim, MPI_Comm _comm)
         MPI_Abort(MPI_COMM_WORLD, rc);
     }
 
-    for(int i = 0; i < CORE_THREAD_MAX; i++) {
-        thread_data[i].init(max_msg_size);
-    }
+    thread_data = new ThreadData[CORE_THREAD_MAX];
+    assert(thread_data);
+
+    out = new ofstream("/scratch/gpfs/gchirkov/dump.txt", ios::binary);
+    assert(out != NULL);
+    PIN_MutexInit(&mutex);
 }
 
 void CoreManager::startSim()
 {
-    int rc;
     auto& tdata = thread_data[0];
+    if (!tdata.valid)
+        tdata.init(max_msg_size);
+
     auto& msg = tdata.msgs[0];
     msg.is_control = true;
     msg.message_type = PROCESS_STARTING;
     msg.tid = 0;
     msg.pid = pid;
     msg.payload_len = 1;
-    MPI_Send(&msg, sizeof(MPIMsg), MPI_CHAR, 0, 0, comm);
+    MPI_Send(&msg, sizeof(MPIMsg), MPI_CHAR, 0, tdata.recv_thread_num, comm);
+    // dumpTrace(&msg, 1);
+
 
     // Create new new communicator without uncore process to 
     // barrier all core processes before simulation start
@@ -83,13 +94,14 @@ void CoreManager::startSim()
     MPI_Comm   barrier_comm;
     createCommWithoutUncore(comm, &barrier_comm);
 
-    rc = MPI_Comm_rank(barrier_comm, &barrier_rank);
+    int rc = MPI_Comm_rank(barrier_comm, &barrier_rank);
     if (rc != MPI_SUCCESS) {
         cerr << "Process not in the barrier comm. Terminating.\n";
         MPI_Abort(MPI_COMM_WORLD, rc);
     }
 
     MPI_Barrier(barrier_comm);
+    MPI_Comm_free(&barrier_comm);
 }
 
 
@@ -126,7 +138,8 @@ void CoreManager::drainMemReqs(THREADID tid) {
     msg.tid = tid;
     msg.pid = pid;
     msg.payload_len = tdata.mpi_pos;
-    MPI_Send(tdata.msgs, tdata.mpi_pos * sizeof(MPIMsg), MPI_CHAR, 0, 0, comm);
+    MPI_Send(tdata.msgs, tdata.mpi_pos * sizeof(MPIMsg), MPI_CHAR, 0, tdata.recv_thread_num, comm);
+    // dumpTrace(tdata.msgs, tdata.mpi_pos);
 
     tdata.mpi_pos = 1;
 }
@@ -147,7 +160,9 @@ void CoreManager::threadStart(THREADID tid, CONTEXT *ctxt, int32_t flags, void *
     msg.pid = pid;
     msg.payload_len = 1;
 
-    MPI_Send(&msg, sizeof(MPIMsg), MPI_CHAR, 0, 0, comm);
+    MPI_Send(&msg, sizeof(MPIMsg), MPI_CHAR, 0, tdata.recv_thread_num, comm);
+    MPI_Recv(&tdata.recv_thread_num, 1, MPI_INT, 0, tid, comm, MPI_STATUS_IGNORE);
+    // dumpTrace(&msg, 1);
 }
 
 
@@ -168,7 +183,8 @@ void CoreManager::threadFini(THREADID tid, const CONTEXT *ctxt, int32_t code, vo
     msg.pid = pid;
     msg.payload_len = 1;
 
-    MPI_Send(&msg, sizeof(MPIMsg), MPI_CHAR, 0, 0, comm);
+    MPI_Send(&msg, sizeof(MPIMsg), MPI_CHAR, 0, tdata.recv_thread_num, comm);
+    // dumpTrace(&msg, 1);
 }
 
 
@@ -192,10 +208,9 @@ void CoreManager::sysBefore(ADDRINT ip, ADDRINT num, ADDRINT arg0, ADDRINT arg1,
             msg.tid = tid;
             msg.pid = pid;
             msg.payload_len = 1;
-            MPI_Send(&msg, sizeof(MPIMsg), MPI_CHAR, 0, 0, comm);
+            MPI_Send(&msg, sizeof(MPIMsg), MPI_CHAR, 0, tdata.recv_thread_num, comm);
+            // dumpTrace(&msg, 1);
         }
-
-
     }
     syscall_count++;
 }
@@ -212,10 +227,8 @@ void CoreManager::sysAfter(ADDRINT ret, THREADID tid)
         msg.tid = tid;
         msg.pid = pid;
         msg.payload_len = 1;
-        MPI_Send(&msg, sizeof(MPIMsg), MPI_CHAR, 0, 0, comm);
-    }
-    else {
-        //tdata.cycle += syscall_cost;
+        MPI_Send(&msg, sizeof(MPIMsg), MPI_CHAR, 0, tdata.recv_thread_num, comm);
+        // dumpTrace(&msg, 1);
     }
 }
 
@@ -251,11 +264,21 @@ void CoreManager::finishSim(int32_t code, void *v)
     msg.tid = 0;
     msg.pid = pid;
 
-    MPI_Send(&msg, sizeof(MPIMsg), MPI_CHAR, 0, 0, comm);
+    MPI_Send(&msg, sizeof(MPIMsg), MPI_CHAR, 0, tdata.recv_thread_num, comm);
+    // dumpTrace(&msg, 1);
+    PIN_MutexFini(&mutex);
+    delete [] thread_data;
+    MPI_Comm_free(&comm);
     MPI_Finalize();
+}
+
+void CoreManager::dumpTrace(MPIMsg* trace, size_t num) {
+    PIN_MutexLock(&mutex);
+    out->write((const char*)trace, sizeof(MPIMsg) * num);
+    PIN_MutexUnlock(&mutex);
 }
 
 CoreManager::~CoreManager()
 {
-
+    // out->close();
 }       

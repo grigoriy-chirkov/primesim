@@ -37,13 +37,13 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 enum MessageType
 {
     MEM_REQUESTS = 0,
-    PROCESS_STARTING = -3,
-    PROCESS_FINISHING = -1,
-    NEW_THREAD = -4,
-    THREAD_FINISHING = -8,
-    PROGRAM_EXITING = -5,
-    THREAD_LOCK = -6,
-    THREAD_UNLOCK = -7
+    PROCESS_STARTING = 3,
+    PROCESS_FINISHING = 1,
+    NEW_THREAD = 4,
+    THREAD_FINISHING = 8,
+    PROGRAM_EXITING = 5,
+    THREAD_LOCK = 6,
+    THREAD_UNLOCK = 7
 };
 
 struct MPIMsg
@@ -52,17 +52,17 @@ struct MPIMsg
     union {
         struct { // control msg
             MessageType  message_type;
-            int          tid;
-            int          pid;
-            uint64_t     payload_len;
-        };
+            uint16_t     tid;
+            uint16_t     pid;
+            uint16_t     payload_len;
+        } __attribute__((packed));
         struct { // mem msg
             bool        mem_type; //1 means write, 0 means read
             uint64_t    addr_dmem; 
-            uint64_t    ins_before;
-        };
-    };
-};
+            uint16_t    ins_before;
+        } __attribute__((packed));
+    } __attribute__((packed));
+} __attribute__((packed));
 
 enum MemType
 {
@@ -103,6 +103,8 @@ static void createCommWithoutUncore(MPI_Comm comm, MPI_Comm* barrier_comm) {
         std::cerr << "Could not create barrier comm. Terminating.\n";
         MPI_Abort(MPI_COMM_WORLD, rc);
     }
+
+
 }
 
 #define CORE_THREAD_MAX 1024

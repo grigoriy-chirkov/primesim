@@ -60,6 +60,7 @@ class CoreManager
         int mpi_pos = 1;
         ThreadState thread_state = DEAD;
         bool valid = false;
+        int recv_thread_num = 0;
 
         void init(int max_msg_size) {
             valid = true;
@@ -85,17 +86,20 @@ class CoreManager
         void threadFini(THREADID threadid, const CONTEXT *ctxt, int32_t code, void *v);
         void syscallEntry(THREADID threadIndex, CONTEXT *ctxt, SYSCALL_STANDARD std, void *v);
         void syscallExit(THREADID threadIndex, CONTEXT *ctxt, SYSCALL_STANDARD std, void *v);
+        void dumpTrace(MPIMsg* trace, size_t num);
         ~CoreManager();        
     private:
         void drainMemReqs(THREADID threadid);
         void sysBefore(ADDRINT ip, ADDRINT num, ADDRINT arg0, ADDRINT arg1, ADDRINT arg2, 
                ADDRINT arg3, ADDRINT arg4, ADDRINT arg5, THREADID threadid);
         void sysAfter(ADDRINT ret, THREADID threadid);
-        ThreadData thread_data[CORE_THREAD_MAX];
+        ThreadData* thread_data;
         int syscall_count;
         int max_msg_size;
         int pid;
         MPI_Comm comm;
+        std::ofstream* out;
+        PIN_MUTEX mutex;
 };
 
 

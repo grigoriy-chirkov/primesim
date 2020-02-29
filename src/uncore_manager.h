@@ -55,7 +55,6 @@ struct HandlerArgs {
     int tid;
 };
 
-
 struct HandlerData {
     pthread_t handle;
     HandlerArgs args;
@@ -64,7 +63,7 @@ struct HandlerData {
         args.uncore_manager = uncore_manager;
         args.tid = tid;
     }
-};
+} __attribute__((aligned(64)));
 
 struct CoreData {
     MPIMsg* msgs = NULL;
@@ -72,95 +71,26 @@ struct CoreData {
     uint64_t out_pos = 0;
     uint64_t count = 0;
     uint64_t max_count = 0;
-
     pthread_mutex_t mutex; // needed to add/remove data from the buffer
     pthread_cond_t can_produce; // signaled when items are removed
+    
     bool valid = false;
-    int cid;
-    int pid; 
-    int tid;
+    int cid = -1;
+    int pid = -1; 
+    int tid = -1;
 
     uint64_t cycle = 0;
-    uint64_t start_cycle = 0;
+    uint64_t segment = 0;
     uint64_t ins_nonmem = 0;
     uint64_t ins_mem = 0;
     uint64_t mem_cycles = 0;
     uint64_t nonmem_cycles = 0;
 
-    void init(int _cid, int _pid, int _tid, uint64_t _cycle, int max_msg_size) {
-        max_count = (max_msg_size + 1) * BUF_SIZE;
-        msgs = new MPIMsg[max_count];
-        assert(msgs != NULL);
-        memset(msgs, 0, max_count*sizeof(MPIMsg));
-        in_pos = 0;
-        out_pos = 0;
-        count = 0;
-
-        valid = true;
-        cid = _cid;
-        pid = _pid;
-        tid = _tid;
-        cycle = start_cycle = _cycle;
-
-        pthread_mutex_init(&mutex, NULL);
-        pthread_cond_init(&can_produce, NULL);
-    };
-
-    ~CoreData() {
-        if (valid) {
-            delete [] msgs;
-            pthread_mutex_destroy(&mutex);
-            pthread_cond_destroy(&can_produce);
-        }
-    }
-
-    void insert_msg(const MPIMsg* inbuffer, size_t num) {
-        pthread_mutex_lock(&mutex);
-        while(count + num >= max_count) { // full
-        // wait until some elements are consumed
-            pthread_cond_wait(&can_produce, &mutex);
-        }
-
-        if (num > max_count - in_pos){
-            uint64_t part1 = max_count - in_pos;
-            uint64_t part2 = num - part1;    
-            memcpy(msgs+in_pos, inbuffer, sizeof(MPIMsg)*part1);
-            memcpy(msgs, inbuffer+part1, sizeof(MPIMsg)*part2);  
-        } else {
-            memcpy(msgs+in_pos, inbuffer, sizeof(MPIMsg)*num);
-        }
-
-        count += num;
-        in_pos = (in_pos + num) % max_count;
-        pthread_mutex_unlock(&mutex);
-    }
-
-    bool eject_msg(MPIMsg* outbuffer) {
-        pthread_mutex_lock(&mutex);
-        if (count == 0) {
-            pthread_mutex_unlock(&mutex);
-            return false;
-        }
-
-        memcpy(outbuffer, msgs+out_pos, sizeof(MPIMsg));
-        out_pos = (out_pos + 1) % max_count;
-        count--;
-        pthread_cond_signal(&can_produce);
-        pthread_mutex_unlock(&mutex);
-        return true;
-    }
-
-    void report(ofstream& report_ofstream) {
-        uint64_t ins_count = ins_mem + ins_nonmem;
-        uint64_t cycle_count = nonmem_cycles + mem_cycles;
-        report_ofstream << "---------------------------------------------------------\n";
-        report_ofstream << "Core " <<cid<< " runs " << ins_count << " instructions in " << cycle_count <<" cycles" << endl;
-        report_ofstream << "Core " <<cid<< " average IPC = "<< double(ins_count) / double(cycle_count) << endl;
-        report_ofstream << "Core " <<cid<< " memory instructions: "<< ins_mem <<endl;
-        report_ofstream << "Core " <<cid<< " memory access cycles: "<< mem_cycles <<endl;
-        report_ofstream << "Core " <<cid<< " non-memory instructions: "<< ins_nonmem <<endl;
-        report_ofstream << "Core " <<cid<< " non-memory cycles: "<< nonmem_cycles <<endl;
-    }
+    void init(int _cid, int _pid, int _tid, uint64_t _cycle, int max_msg_size);
+    ~CoreData();
+    void insert_msg(const MPIMsg* inbuffer, size_t num);
+    size_t eject_msg(MPIMsg* outbuffer, size_t num);
+    void report(ofstream& report_ofstream);
 } __attribute__ ((aligned (64)));
 
 class UncoreManager
@@ -168,36 +98,37 @@ class UncoreManager
 public:
     void init(const XmlSim* xml_sim);
     void report(const char* result_basename);
-    void msgProducer();
+    void msgProducer(int );
     void msgConsumer(int );
     void spawn_threads();  
     void collect_threads();      
     ~UncoreManager();
 private:
-    System* sys;
-    ThreadSched* thread_sched;
-    HandlerData* handler_data;
-    CoreData* core_data;
-    std::list<int>* proc_list;
-    pthread_t producer_thread_handle;
+    System* sys = NULL;
+    ThreadSched* thread_sched = NULL;
+    HandlerData* producers = NULL;
+    HandlerData* consumers = NULL;
+    CoreData* core_data = NULL;
+    int proc_num = 0;
 
-    struct timespec sim_start_time;
-    struct timespec sim_finish_time;
+    double sim_start_time;
+    double sim_finish_time;
 
     pthread_mutex_t mutex;
     MPI_Comm   comm;
     bool simulation_finished;
-
-    uint64_t barrier_cycle;
-    int barrier_cnt;
     int num_threads_live;
+    std::vector<uint64_t>* segment_cnt = NULL;
+    uint64_t cur_segment = 0;
 
     int max_msg_size;
-    int num_recv_threads;
+    int num_cons_threads;
+    int num_prod_threads;
     uint64_t thread_sync_interval;
     uint64_t proc_sync_interval;
     double cpi_nonmem;
     double freq;
+    //ifstream* in;
 
     void lock();
     void unlock();
