@@ -59,7 +59,6 @@ void *msgConsumerWrapper(void *args)
 
 void UncoreManager::init(const XmlSim* xml_sim)
 {
-    simulation_finished = false;
     sys = new System;
     assert(sys != NULL);
     sys->init(&xml_sim->sys);
@@ -69,7 +68,7 @@ void UncoreManager::init(const XmlSim* xml_sim)
 
     max_msg_size = xml_sim->max_msg_size;
     num_cons_threads = xml_sim->num_recv_threads;
-    num_prod_threads = 16;
+    num_prod_threads = 64;
     thread_sync_interval = xml_sim->thread_sync_interval;
     proc_sync_interval = xml_sim->proc_sync_interval;
     cpi_nonmem = xml_sim->sys.cpi_nonmem;
@@ -103,11 +102,8 @@ void UncoreManager::init(const XmlSim* xml_sim)
     MPI_Comm   barrier_comm;
     createCommWithoutUncore(comm, &barrier_comm);
 
-    num_threads_live = 0;
-
     segment_cnt = new std::vector<uint64_t>;
     segment_cnt->push_back(0);
-    cur_segment = 0;
 
     // in = new ifstream("/scratch/gpfs/gchirkov/dump.txt", ios::binary);
     // assert(in != NULL);
@@ -146,15 +142,10 @@ void UncoreManager::msgProducer(int my_tid) {
                     MPI_Abort(MPI_COMM_WORLD, -1);
                     exit(-1);
                 } 
-                core_data[cid].init(cid, msg.pid, msg.tid, getCycle(), max_msg_size);
-                num_threads_live++;
-                // if (core_data[cid].cycle >= barrier_cycle) {
-                //     threads_in_barrier++;
-                // }
-                int recv_thread_num = cid % num_prod_threads;
-                MPI_Send(&recv_thread_num, 1, MPI_INT, msg.pid, msg.tid, comm);
-                cout << "[PriME] Pin thread " << msg.tid << " from process " << msg.pid << " begins in core " << cid << endl;
                 unlock();
+                auto& cdata = core_data[cid];
+                cdata.init(cid, msg.pid, msg.tid, getCycle(), max_msg_size);
+                cdata.insert_msg(inbuffer, msg.payload_len);
                 break;
             }
             default: {
@@ -181,8 +172,10 @@ void UncoreManager::msgConsumer(int my_tid) {
             if (!cdata.valid)
                 continue;
 
-            if (cdata.segment > cur_segment) 
+            if (cdata.segment > cur_segment) {
+                 // cout << cid << " " << cdata.segment << "  " << cur_segment << " " << segment_cnt->at(cur_segment) << " " << num_threads_live << endl << flush;
                 continue;
+            }
 
             uint64_t msg_num = cdata.eject_msg(msg_buffer, batch_size);
             if (msg_num == 0) 
@@ -191,7 +184,6 @@ void UncoreManager::msgConsumer(int my_tid) {
             for (uint64_t i = 0; i < msg_num; i++) {
                 MPIMsg& msg = msg_buffer[i];
                 if (msg.is_control) {
-                    // int msg.pid = 1;
                     switch (msg.message_type) {
                         case PROCESS_FINISHING: {
                             lock();
@@ -200,6 +192,15 @@ void UncoreManager::msgConsumer(int my_tid) {
                                 simulation_finished = true;
                             cout << "[PriME] Pin process " << msg.pid << " finishes"<<endl;
                             unlock();
+                            break;
+                        }
+                        case NEW_THREAD: {
+                            lock();
+                            num_threads_live++;
+                            cout << "[PriME] Pin thread " << msg.tid << " from process " << msg.pid << " begins in core " << cid << endl;
+                            unlock();
+                            int recv_thread_num = cid % num_prod_threads;
+                            MPI_Send(&recv_thread_num, 1, MPI_INT, msg.pid, msg.tid, comm);
                             break;
                         }
                         case THREAD_FINISHING: {
@@ -212,7 +213,7 @@ void UncoreManager::msgConsumer(int my_tid) {
                         }
                         case THREAD_LOCK:{
                             lock();
-                            num_threads_live--;
+                            //num_threads_live--;
                             cout << "[PriME] Thread " << msg.tid << " from process " << msg.pid << " locks" << endl;
                             unlock();
                             break;
@@ -220,15 +221,15 @@ void UncoreManager::msgConsumer(int my_tid) {
                         case THREAD_UNLOCK: {
                             lock();
                             cdata.cycle = getCycle();
-                            num_threads_live++;
+                            //num_threads_live++;
                             cout << "[PriME] Thread " << msg.tid << " from process " << msg.pid << " unlocks" << endl;
                             unlock();
                             break;
                         }
                         case MEM_REQUESTS: {
-                            lock();
-                            cout << "[PriME] Thread " << msg.tid << " from process " << msg.pid << " makes " << msg.payload_len-1 << " memory requests " << endl;
-                            unlock();
+                            // lock();
+                            // cout << "[PriME] Thread " << msg.tid << " from process " << msg.pid << " makes " << msg.payload_len-1 << " memory requests " << endl;
+                            // unlock();
                             break;
                         }
                         default:{
@@ -236,7 +237,8 @@ void UncoreManager::msgConsumer(int my_tid) {
                             MPI_Abort(MPI_COMM_WORLD, -1);
                             //exit(-1);
                         }
-                    }            
+                    }
+                    assert(num_threads_live >= 0);
                 } 
                 else {
                     InsMem ins_mem;
@@ -260,28 +262,25 @@ void UncoreManager::msgConsumer(int my_tid) {
             }
 
             uint64_t new_seg = cdata.cycle / thread_sync_interval;
-            if (segment_cnt->size() <= max(new_seg, cur_segment)+1) {
-                lock();
-                if (segment_cnt->size() <= max(new_seg, cur_segment)+1) {
-                    segment_cnt->resize(max(new_seg, cur_segment)+1, 0);
-                }
-                unlock();
-            }
 
+            reserveSegmentCntSpace(new_seg);
             for (uint64_t i = cdata.segment; i < new_seg; i++) {
                 lock();
                 segment_cnt->at(i) += 1;
-                //cout << cid << " " << i << " " << segment_cnt->size() << " " << segment_cnt->at(i) << endl;
                 unlock();
             }
             cdata.segment = new_seg;
+        }
 
+        reserveSegmentCntSpace(cur_segment);
+        if (segment_cnt->at(cur_segment) >= max(num_threads_live, 1)) {
+            lock();
             if (segment_cnt->at(cur_segment) >= num_threads_live) {
-                lock();
                 cur_segment++;
-                unlock();
+                if (cur_segment % 10 == 0)
+                    cout << "[PriME] Segment " << cur_segment << " finished" << endl;
             }
-
+            unlock();
         }
 
         if (simulation_finished) {
@@ -291,6 +290,16 @@ void UncoreManager::msgConsumer(int my_tid) {
     }
 }
 
+void UncoreManager::reserveSegmentCntSpace(uint64_t num) 
+{
+    if (segment_cnt->size() <= num+1) {
+        lock();
+        if (segment_cnt->size() <= num+1) {
+            segment_cnt->resize(2*num+1, 0);
+        }
+        unlock();
+    }
+}
 
 
 void UncoreManager::getSimStartTime()

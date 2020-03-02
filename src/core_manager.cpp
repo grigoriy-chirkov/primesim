@@ -67,8 +67,8 @@ void CoreManager::init(XmlSim* xml_sim, MPI_Comm _comm)
     thread_data = new ThreadData[CORE_THREAD_MAX];
     assert(thread_data);
 
-    out = new ofstream("/scratch/gpfs/gchirkov/dump.txt", ios::binary);
-    assert(out != NULL);
+    // out = new ofstream("/scratch/gpfs/gchirkov/dump.txt", ios::binary);
+    // assert(out != NULL);
     PIN_MutexInit(&mutex);
 }
 
@@ -273,9 +273,9 @@ void CoreManager::finishSim(int32_t code, void *v)
 }
 
 void CoreManager::dumpTrace(MPIMsg* trace, size_t num) {
-    PIN_MutexLock(&mutex);
-    out->write((const char*)trace, sizeof(MPIMsg) * num);
-    PIN_MutexUnlock(&mutex);
+    // PIN_MutexLock(&mutex);
+    // out->write((const char*)trace, sizeof(MPIMsg) * num);
+    // PIN_MutexUnlock(&mutex);
 }
 
 CoreManager::~CoreManager()

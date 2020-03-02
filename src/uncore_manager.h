@@ -109,15 +109,15 @@ private:
     HandlerData* producers = NULL;
     HandlerData* consumers = NULL;
     CoreData* core_data = NULL;
-    int proc_num = 0;
 
     double sim_start_time;
     double sim_finish_time;
 
     pthread_mutex_t mutex;
     MPI_Comm   comm;
-    bool simulation_finished;
-    int num_threads_live;
+    bool simulation_finished = false;
+    int proc_num = 0;
+    int num_threads_live = 0;
     std::vector<uint64_t>* segment_cnt = NULL;
     uint64_t cur_segment = 0;
 
@@ -144,6 +144,7 @@ private:
     double getAvgCycle();
     void getSimStartTime();
     void getSimFinishTime();
+    void reserveSegmentCntSpace(uint64_t num);
 };
 
 
