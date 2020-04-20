@@ -1,8 +1,8 @@
 //===========================================================================
-// page_table.h 
+// system.cpp simulates inclusive multi-level cache system with NoC and memory
 //===========================================================================
 /*
-Copyright (c) 2015 Princeton University
+Copyright (c) 2020 Princeton University
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -28,44 +28,29 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifndef  PAGETABLE_H
-#define  PAGETABLE_H
+#ifndef CACHE_STASH_H
+#define CACHE_STASH_H
 
-#include <string>
-#include <inttypes.h>
-#include <fstream>
-#include <stdio.h>
-#include <iostream>
-#include <cmath>
-#include <set>
-#include <map>
-#include <vector>
-#include "common.h"
+#include <pthread.h>
+#include <list>
+
 #include "cache.h"
-#include <pthread.h> 
 
 
-typedef pair<int, uint64_t> UKey;
-typedef map<UKey, uint64_t> PageMap; 
-
-
-class PageTable
+class CacheStash
 {
-    public:
-        void init(int page_size_in, int delay_in);
-        uint64_t getPageId(uint64_t addr);
-        uint64_t translate(InsMem* ins_mem);
-        int getTransDelay();
-        void report(ofstream& result);
-        IntSet prog_set;
-        ~PageTable();        
-    private:
-        int page_size;
-        int delay;
-        uint64_t empty_page_num;
-        pthread_mutex_t   lock;
-        PageMap page_map;
+	pthread_mutex_t mutex;
+	std::list<uint64_t> storage;
+	int size = 0;
+	CacheStash() {};
+
+public:
+	CacheStash(int size);
+	~CacheStash();
+	bool contains(uint64_t addr);
+	void insert(uint64_t addr);
+	void eject(uint64_t addr);
+	void insert_unique(uint64_t addr);
 };
 
-
-#endif //PAGETABLE_H
+#endif // ifndef CACHE_STASH_H

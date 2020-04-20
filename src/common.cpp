@@ -1,5 +1,5 @@
 //===========================================================================
-// page_table.h 
+// common.h 
 //===========================================================================
 /*
 Copyright (c) 2015 Princeton University
@@ -28,44 +28,30 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifndef  PAGETABLE_H
-#define  PAGETABLE_H
-
-#include <string>
-#include <inttypes.h>
-#include <fstream>
-#include <stdio.h>
 #include <iostream>
-#include <cmath>
-#include <set>
-#include <map>
-#include <vector>
-#include "common.h"
-#include "cache.h"
-#include <pthread.h> 
+#include "mpi.h"
 
+void createCommWithoutUncore(MPI_Comm& comm, MPI_Comm* barrier_comm) {
+    // Create new new communicator without uncore process to 
+    // barrier all core processes before simulation start
+    int rc;
+    int rank_excl[1] = {0};
+    MPI_Group prime_group, barrier_group;
+    rc = MPI_Comm_group(comm, &prime_group); 
+    if (rc != MPI_SUCCESS) {
+        std::cerr << "Could not extract group. Terminating.\n";
+        MPI_Abort(MPI_COMM_WORLD, rc);
+    }
 
-typedef pair<int, uint64_t> UKey;
-typedef map<UKey, uint64_t> PageMap; 
+    rc = MPI_Group_excl(prime_group, 1, rank_excl, &barrier_group);
+    if (rc != MPI_SUCCESS) {
+        std::cerr << "Could not create barrier group. Terminating.\n";
+        MPI_Abort(MPI_COMM_WORLD, rc);
+    }
 
-
-class PageTable
-{
-    public:
-        void init(int page_size_in, int delay_in);
-        uint64_t getPageId(uint64_t addr);
-        uint64_t translate(InsMem* ins_mem);
-        int getTransDelay();
-        void report(ofstream& result);
-        IntSet prog_set;
-        ~PageTable();        
-    private:
-        int page_size;
-        int delay;
-        uint64_t empty_page_num;
-        pthread_mutex_t   lock;
-        PageMap page_map;
-};
-
-
-#endif //PAGETABLE_H
+    rc = MPI_Comm_create(comm, barrier_group, barrier_comm);
+    if (rc != MPI_SUCCESS) {
+        std::cerr << "Could not create barrier comm. Terminating.\n";
+        MPI_Abort(MPI_COMM_WORLD, rc);
+    }
+}

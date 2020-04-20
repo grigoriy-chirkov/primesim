@@ -40,29 +40,35 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "network.h"
 #include "page_table.h"
 #include "dram.h"
-#include "common.h"
 
-typedef enum SysType
+enum SysType
 {
     DIRECTORY = 0,
     BUS = 1
-} SysType;
+};
 
-typedef enum 
+enum Protocol
 {
     MESI = 0,
     WRITE_UPDATE = 1
-} Protocol;
+};
 
-typedef enum ProtocolType
+enum ProtocolType
 {
     FULL_MAP = 0,
     LIMITED_PTR = 1
-} ProtocolType;
+};
+
+enum MemType
+{
+    INV   = -1, // invalid
+    RD    = 0,  //read
+    WR    = 1,  //write
+    WB    = 2   //writeback
+};
 
 
-
-typedef struct CacheLevel
+struct CacheLevel
 {
     int         level;
     int         share;
@@ -71,14 +77,21 @@ typedef struct CacheLevel
     uint64_t    size;
     uint64_t    num_ways;
     uint64_t    block_size;
-    uint64_t    ins_count;
-    uint64_t    miss_count;
-    uint64_t    ins_count_timeline;
-    uint64_t    timeline;
-    double      miss_rate;
-    double      timeline_avg;
-    double      lock_time;
-} CacheLevel;
+    uint64_t    ins_count = 0;
+    uint64_t    miss_count = 0;
+    double      miss_rate = 0.0;
+    double      lock_time = 0.0;
+
+    void init(int _level, int _share, int _num_caches, int _access_time, uint64_t _size, uint64_t _block_size, uint64_t _num_ways) {
+        level = _level;
+        share = _share;
+        num_caches = _num_caches;
+        access_time = _access_time;
+        size = _size;
+        block_size = _block_size;
+        num_ways = _num_ways;
+    }
+};
 
 
 
@@ -90,22 +103,23 @@ class System
         Cache* init_caches(int level, int cache_id);
         void init_directories(int home_id);
         int access(int core_id, InsMem* ins_mem, int64_t timer);
-        char mesi_bus(Cache* cache_cur, int level, int cache_id, int core_id, InsMem* ins_mem, int64_t timer);
-        char write_update_bus(Cache* cache_cur, int level, int cache_id, int core_id, InsMem* ins_mem, int64_t timer);
-        char mesi_directory(Cache* cache_cur, int level, int cache_id, int core_id, InsMem* ins_mem, int64_t timer);
+        State mesi_bus(Cache* cache_cur, int level, int cache_id, int core_id, InsMem* ins_mem, int64_t timer);
+        State write_update_bus(Cache* cache_cur, int level, int cache_id, int core_id, InsMem* ins_mem, int64_t timer);
+        State mesi_directory(Cache* cache_cur, int level, int cache_id, int core_id, InsMem* ins_mem, int64_t timer);
         int share(Cache* cache_cur, InsMem* ins_mem);
         int share_children(Cache* cache_cur, InsMem* ins_mem);
         int inval(Cache* cache_cur, InsMem* ins_mem);
         int inval_children(Cache* cache_cur, InsMem* ins_mem);
         int modify(Cache* cache_cur, InsMem* ins_mem, bool shared = false);
         int modify_children(Cache* cache_cur, InsMem* ins_mem, bool shared = false);
-        int accessDirectoryCache(int cache_id, int home_id, InsMem* ins_mem, int64_t timer, char* state);
-        int accessSharedCache(int cache_id, int home_id, InsMem* ins_mem, int64_t timer, char* state);
+        int accessDirectoryCache(int cache_id, int home_id, InsMem* ins_mem, int64_t timer, State* state);
+        int accessSharedCache(int cache_id, int home_id, InsMem* ins_mem, int64_t timer, State* state);
         int allocHomeId(int num_homes, uint64_t addr);
         int getHomeId(InsMem *ins_mem);
         int tlb_translate(InsMem *ins_mem, int core_id, int64_t timer);
         int getCoreCount();
         void report(ofstream& result_ofstream);
+        int get_parent_cache_id(int cache_id, int level);
         ~System();        
     private:
         int        sys_type;

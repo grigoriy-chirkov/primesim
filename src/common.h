@@ -33,7 +33,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "mpi.h"
 
-
 enum MessageType
 {
     MEM_REQUESTS = 0,
@@ -43,33 +42,28 @@ enum MessageType
     THREAD_FINISHING = 8,
     PROGRAM_EXITING = 5,
     THREAD_LOCK = 6,
-    THREAD_UNLOCK = 7
+    THREAD_UNLOCK = 7, 
+    TERMINATE = 2
 };
 
 struct MPIMsg
-{
+{   
     bool is_control; 
     union {
         struct { // control msg
             MessageType  message_type;
-            uint16_t     tid;
-            uint16_t     pid;
-            uint16_t     payload_len;
+            int          tid;
+            int          pid;
+            int          payload_len;
         } __attribute__((packed));
         struct { // mem msg
             bool        mem_type; //1 means write, 0 means read
             uint64_t    addr_dmem; 
-            uint16_t    ins_before;
+            uint32_t    ins_before;
         } __attribute__((packed));
     } __attribute__((packed));
 } __attribute__((packed));
 
-enum MemType
-{
-    RD    = 0,  //read
-    WR    = 1,  //write
-    WB    = 2   //writeback
-};
 
 enum ThreadState
 {
@@ -80,34 +74,8 @@ enum ThreadState
     WAIT    = 4
 };
 
-static void createCommWithoutUncore(MPI_Comm comm, MPI_Comm* barrier_comm) {
-    // Create new new communicator without uncore process to 
-    // barrier all core processes before simulation start
-    int rc;
-    int rank_excl[1] = {0};
-    MPI_Group prime_group, barrier_group;
-    rc = MPI_Comm_group(comm, &prime_group); 
-    if (rc != MPI_SUCCESS) {
-        std::cerr << "Could not extract group. Terminating.\n";
-        MPI_Abort(MPI_COMM_WORLD, rc);
-    }
+void createCommWithoutUncore(MPI_Comm& comm, MPI_Comm* barrier_comm);
 
-    rc = MPI_Group_excl(prime_group, 1, rank_excl, &barrier_group);
-    if (rc != MPI_SUCCESS) {
-        std::cerr << "Could not create barrier group. Terminating.\n";
-        MPI_Abort(MPI_COMM_WORLD, rc);
-    }
-
-    rc = MPI_Comm_create(comm, barrier_group, barrier_comm);
-    if (rc != MPI_SUCCESS) {
-        std::cerr << "Could not create barrier comm. Terminating.\n";
-        MPI_Abort(MPI_COMM_WORLD, rc);
-    }
-
-
-}
-
-#define CORE_THREAD_MAX 1024
 
 
 #endif  // COMMON_H

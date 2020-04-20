@@ -46,8 +46,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "mpi.h"
 
-#define BUF_SIZE 1024
-
 class UncoreManager;
 
 struct HandlerArgs {
@@ -78,6 +76,7 @@ struct CoreData {
     int cid = -1;
     int pid = -1; 
     int tid = -1;
+    bool finished = false;
 
     uint64_t cycle = 0;
     uint64_t segment = 0;
@@ -90,6 +89,7 @@ struct CoreData {
     ~CoreData();
     void insert_msg(const MPIMsg* inbuffer, size_t num);
     size_t eject_msg(MPIMsg* outbuffer, size_t num);
+    size_t empty_slots();
     void report(ofstream& report_ofstream);
 } __attribute__ ((aligned (64)));
 
@@ -115,10 +115,9 @@ private:
 
     pthread_mutex_t mutex;
     MPI_Comm   comm;
-    bool simulation_finished = false;
     int proc_num = 0;
     int num_threads_live = 0;
-    std::vector<uint64_t>* segment_cnt = NULL;
+    std::vector<int>* segment_cnt = NULL;
     uint64_t cur_segment = 0;
 
     int max_msg_size;
@@ -135,7 +134,6 @@ private:
     void add_proc(int pid);
     void rm_proc(int pid);
     int allocCore(int pid, int tid);
-    int deallocCore(int pid, int tid);
     int getCoreId(int pid, int tid);
     int getProcId(int cid);
     int getCoreCount();

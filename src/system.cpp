@@ -62,23 +62,21 @@ void System::init(const XmlSys* xml_sys_in)
 
     hit_flag = new bool [num_cores];
     delay = new int [num_cores];
+    assert(hit_flag != NULL && delay != NULL);
     for (int i = 0; i < num_cores; i++) {
         hit_flag[i] = false;
         delay[i] = 0;
     }
     cache_level = new CacheLevel [num_levels];
+    assert(cache_level != NULL);
     for (int i = 0; i < num_levels; i++) {
-        cache_level[i].level = xml_sys->cache[i].level;
-        cache_level[i].share = xml_sys->cache[i].share;
-        cache_level[i].num_caches = (int)ceil((double)num_cores / cache_level[i].share);
-        cache_level[i].access_time = xml_sys->cache[i].access_time;
-        cache_level[i].size = xml_sys->cache[i].size;
-        cache_level[i].block_size = xml_sys->cache[i].block_size;
-        cache_level[i].num_ways = xml_sys->cache[i].num_ways;
-        cache_level[i].ins_count = 0;
-        cache_level[i].miss_count = 0;
-        cache_level[i].miss_rate = 0;
-        cache_level[i].lock_time = 0;
+        cache_level[i].init(xml_sys->cache[i].level, 
+                            xml_sys->cache[i].share, 
+                            (int)ceil((double)num_cores / xml_sys->cache[i].share), 
+                            xml_sys->cache[i].access_time, 
+                            xml_sys->cache[i].size, 
+                            xml_sys->cache[i].block_size,
+                            xml_sys->cache[i].num_ways);
     }
     cache = new Cache** [num_levels];
     for (int i = 0; i < num_levels; i++) {
@@ -89,53 +87,63 @@ void System::init(const XmlSys* xml_sys_in)
     }
 
     bus = new Bus*[num_levels];
+    assert(bus != NULL);
     for (int i = 0; i < num_levels; i++) {
         bus[i] = NULL;
     }
     directory_cache_bus = NULL;
 
 
-    network.init(cache_level[num_levels-1].num_caches, &(xml_sys->network));
+    network.init(cache_level[num_levels-1].num_caches, xml_sys->network);
     home_stat = new int [network.getNumNodes()];
+    assert(home_stat != NULL);
     for (int i = 0; i < network.getNumNodes(); i++) {
         home_stat[i] = 0;
     }
-    if (xml_sys->directory_cache.size > 0) {
+    if (xml_sys->directory_cache->size > 0) {
         directory_cache = new Cache* [network.getNumNodes()];
+        assert(directory_cache != NULL);
         for (int i = 0; i < network.getNumNodes(); i++) {
             directory_cache[i] = NULL;
         }
     }
 
-    if (tlb_enable && xml_sys->tlb_cache.size > 0) {
+    if (tlb_enable && xml_sys->tlb_cache->size > 0) {
         tlb_cache = new Cache [num_cores];
+        assert(tlb_cache != NULL);
         for (int i = 0; i < num_cores; i++) {
-            tlb_cache[i].init(&(xml_sys->tlb_cache), NULL, TLB_CACHE, page_size, 0, i);
+            tlb_cache[i].init(xml_sys->tlb_cache, NULL, TLB_CACHE, page_size, 0, i);
         }
     }
 
     cache_lock = new pthread_mutex_t* [num_levels];
+    assert(cache_lock != NULL);
     for (int i = 0; i < num_levels; i++) {
         cache_lock[i] = new pthread_mutex_t [cache_level[i].num_caches];
+        assert(cache_lock[i] != NULL);
         for (int j = 0; j < cache_level[i].num_caches; j++) {
             pthread_mutex_init(&cache_lock[i][j], NULL);
         }
     }
 
     directory_cache_lock = new pthread_mutex_t [network.getNumNodes()];
+    assert(directory_cache_lock != NULL);
     for (int i = 0; i < network.getNumNodes(); i++) {
         pthread_mutex_init(&directory_cache_lock[i], NULL);
     }
 
     cache_init_done = new bool* [num_levels];
+    assert(cache_init_done != NULL);
     for (int i = 0; i < num_levels; i++) {
         cache_init_done[i] = new bool [cache_level[i].num_caches];
+        assert(cache_init_done[i] != NULL);
         for (int j = 0; j < cache_level[i].num_caches; j++) {
             cache_init_done[i][j] = false;
         }
     }   
 
     directory_cache_init_done = new bool [network.getNumNodes()];
+    assert(directory_cache_init_done != NULL);
     for (int i = 0; i < network.getNumNodes(); i++) {
         directory_cache_init_done[i] = false;
     }
@@ -181,9 +189,10 @@ Cache* System::init_caches(int level, int cache_id)
     pthread_mutex_lock(&cache_lock[level][cache_id]);
     if (cache[level][cache_id] == NULL) {
         cache[level][cache_id] = new Cache();
+        assert(cache[level][cache_id] != NULL);
         if (bus[level] == NULL) {
             bus[level] = new Bus;
-            bus[level]->init(&(xml_sys->bus));
+            bus[level]->init(xml_sys->bus);
         }
         cache[level][cache_id]->init(&(xml_sys->cache[level]), bus[level], DATA_CACHE, page_size, level, cache_id);
         if (level == 0) {
@@ -193,6 +202,7 @@ Cache* System::init_caches(int level, int cache_id)
         else {
             cache[level][cache_id]->num_children = cache_level[level].share/cache_level[level-1].share;
             cache[level][cache_id]->child = new Cache* [cache[level][cache_id]->num_children];
+            assert(cache[level][cache_id]->child != NULL);
             for (int k = 0; k < cache[level][cache_id]->num_children; k++) {
                 cache[level][cache_id]->child[k] = cache[level-1][cache_id*cache[level][cache_id]->num_children+k];
             }
@@ -223,9 +233,10 @@ void System::init_directories(int home_id)
         directory_cache[home_id] = new Cache();
         if (directory_cache_bus == NULL) {
             directory_cache_bus = new Bus;
-            directory_cache_bus->init(&(xml_sys->bus));    
+            assert(directory_cache_bus != NULL);
+            directory_cache_bus->init(xml_sys->bus);    
         }
-        directory_cache[home_id]->init(&(xml_sys->directory_cache), directory_cache_bus, DIRECTORY_CACHE, page_size, 0, home_id);
+        directory_cache[home_id]->init(xml_sys->directory_cache, directory_cache_bus, DIRECTORY_CACHE, page_size, 0, home_id);
     }
     directory_cache_init_done[home_id] = true;
     pthread_mutex_unlock(&directory_cache_lock[home_id]);
@@ -235,7 +246,7 @@ void System::init_directories(int home_id)
 
 // This function models an acess to a multi-level cache sytem with bus-based
 // MESI coherence protocol
-char System::mesi_bus(Cache* cache_cur, int level, int cache_id, int core_id, InsMem* ins_mem, int64_t timer)
+State System::mesi_bus(Cache* cache_cur, int level, int cache_id, int core_id, InsMem* ins_mem, int64_t timer)
 {
     if (!cache_init_done[level][cache_id]) {
         cache_cur = init_caches(level, cache_id); 
@@ -261,7 +272,7 @@ char System::mesi_bus(Cache* cache_cur, int level, int cache_id, int core_id, In
             if (level != num_levels-1) {
                 if (line_cur->state != M) {
                     line_cur->state = I;
-                    int parent_cache_id = cache_id*cache_level[level].share/cache_level[level+1].share;
+                    int parent_cache_id = get_parent_cache_id(cache_id, level);
                     line_cur->state = mesi_bus(cache_cur->parent, level+1, parent_cache_id, 
                                             core_id, ins_mem, timer+delay[core_id]);
                 }
@@ -308,7 +319,7 @@ char System::mesi_bus(Cache* cache_cur, int level, int cache_id, int core_id, In
         }
         line_cur->timestamp = timer+delay[core_id];
         if (level != num_levels-1) {
-            int parent_cache_id = cache_id*cache_level[level].share/cache_level[level+1].share;
+            int parent_cache_id = get_parent_cache_id(cache_id, level);
             line_cur->state = mesi_bus(cache_cur->parent, level+1, parent_cache_id, 
                                    core_id, ins_mem, timer+delay[core_id]);
         }
@@ -375,10 +386,14 @@ char System::mesi_bus(Cache* cache_cur, int level, int cache_id, int core_id, In
     }
 }
 
+int System::get_parent_cache_id(int cache_id, int level)
+{
+    return cache_id*cache_level[level].share/cache_level[level+1].share;    
+}
 
 // This function models an acess to a multi-level cache sytem with bus-based
 // write-update coherence protocol
-char System::write_update_bus(Cache* cache_cur, int level, int cache_id, int core_id, InsMem* ins_mem, int64_t timer)
+State System::write_update_bus(Cache* cache_cur, int level, int cache_id, int core_id, InsMem* ins_mem, int64_t timer)
 {
     if (!cache_init_done[level][cache_id]) {
         cache_cur = init_caches(level, cache_id); 
@@ -404,7 +419,7 @@ char System::write_update_bus(Cache* cache_cur, int level, int cache_id, int cor
         if (ins_mem->mem_type == WR) {
             if (level != num_levels-1) {
                 if (line_cur->state != M && line_cur->state != MS) {
-                    int parent_cache_id = cache_id*cache_level[level].share/cache_level[level+1].share;
+                    int parent_cache_id = get_parent_cache_id(cache_id, level);
                     line_cur->state = write_update_bus(cache_cur->parent, level+1, parent_cache_id, 
                                           core_id, ins_mem, timer+delay[core_id]);
                 }
@@ -448,7 +463,7 @@ char System::write_update_bus(Cache* cache_cur, int level, int cache_id, int cor
         }
         line_cur->timestamp = timer+delay[core_id];
         if (level != num_levels-1) {
-            int parent_cache_id = cache_id*cache_level[level].share/cache_level[level+1].share;
+            int parent_cache_id = get_parent_cache_id(cache_id, level);
             line_cur->state = write_update_bus(cache_cur->parent, level+1, parent_cache_id, 
                                    core_id, ins_mem, timer+delay[core_id]);
         }
@@ -460,7 +475,6 @@ char System::write_update_bus(Cache* cache_cur, int level, int cache_id, int cor
                     if (i != cache_id) {
                         if (!cache_init_done[num_levels-1][i]) {
                             continue;
-                            //init_caches(num_levels-1, i);
                         }
                         Line* line_temp = cache[num_levels-1][i]->accessLine(ins_mem);
                         if (line_temp != NULL) {
@@ -489,7 +503,6 @@ char System::write_update_bus(Cache* cache_cur, int level, int cache_id, int cor
                     if (i != cache_id) {
                         if (!cache_init_done[num_levels-1][i]) {
                             continue;
-                            init_caches(num_levels-1, i);
                         } 
                         Line* line_temp = cache[num_levels-1][i]->accessLine(ins_mem);
                         if(line_temp != NULL)
@@ -524,10 +537,10 @@ char System::write_update_bus(Cache* cache_cur, int level, int cache_id, int cor
 
 // This function models an access to a multi-level cache sytem with directory-
 // based MESI coherence protocol
-char System::mesi_directory(Cache* cache_cur, int level, int cache_id, int core_id, InsMem* ins_mem, int64_t timer)
+State System::mesi_directory(Cache* cache_cur, int level, int cache_id, int core_id, InsMem* ins_mem, int64_t timer)
 {
     int id_home, delay_bus;
-    char state_tmp;
+    State  state_tmp;
     Line*  line_cur;
     InsMem ins_mem_old;
   
@@ -763,7 +776,7 @@ int System::modify_children(Cache* cache_cur, InsMem* ins_mem, bool shared)
 }
 
 //Access inclusive directory cache without backup directory
-int System::accessDirectoryCache(int cache_id, int home_id, InsMem* ins_mem, int64_t timer, char* state)
+int System::accessDirectoryCache(int cache_id, int home_id, InsMem* ins_mem, int64_t timer, State* state)
 {
 
     if (!directory_cache_init_done[home_id]) {
@@ -874,7 +887,7 @@ int System::accessDirectoryCache(int cache_id, int home_id, InsMem* ins_mem, int
 }
 
 //Access distributed shared LLC with embedded directory cache
-int System::accessSharedCache(int cache_id, int home_id, InsMem* ins_mem, int64_t timer, char* state)
+int System::accessSharedCache(int cache_id, int home_id, InsMem* ins_mem, int64_t timer, State* state)
 {
     if (!directory_cache_init_done[home_id]) {
         init_directories(home_id); 
@@ -1021,7 +1034,7 @@ int System::tlb_translate(InsMem *ins_mem, int core_id, int64_t timer)
 int System::allocHomeId(int num_homes, uint64_t addr)
 {
     //Home bits
-    int offset = (int) log2(xml_sys->directory_cache.block_size );
+    int offset = (int) log2(xml_sys->directory_cache->block_size );
     int home_mask = (int)ceil(log2(num_homes));
     int home_bits = (int)(((addr >> offset)) % (1 << home_mask));
     if (home_bits < num_homes) {
@@ -1095,7 +1108,7 @@ void System::report(ofstream& result_ofstream)
         miss_rate = (double)miss_count / (double)ins_count; 
            
         result_ofstream << "TLB Cache"<<"===========================================================\n";
-        result_ofstream << "Simulation results for "<< xml_sys->tlb_cache.size << " Bytes " << xml_sys->tlb_cache.num_ways
+        result_ofstream << "Simulation results for "<< xml_sys->tlb_cache->size << " Bytes " << xml_sys->tlb_cache->num_ways
                    << "-way set associative cache model:\n";
         result_ofstream << "The total # of TLB access instructions: " << ins_count << endl;
         result_ofstream << "The # of cache-missed instructions: " << miss_count << endl;
@@ -1155,7 +1168,7 @@ void System::report(ofstream& result_ofstream)
     miss_rate = (double)miss_count / (double)ins_count; 
        
     result_ofstream << "Directory Cache"<<"===========================================================\n";
-    result_ofstream << "Simulation results for "<< xml_sys->directory_cache.size << " Bytes " << xml_sys->directory_cache.num_ways
+    result_ofstream << "Simulation results for "<< xml_sys->directory_cache->size << " Bytes " << xml_sys->directory_cache->num_ways
                << "-way set associative cache model:\n";
     result_ofstream << "The total # of memory instructions: " << ins_count << endl;
     result_ofstream << "The # of cache-missed instructions: " << miss_count << endl;

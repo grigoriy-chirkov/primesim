@@ -29,8 +29,8 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include <stdio.h>
 #include "portability.H"
+#include <stdio.h>
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -41,28 +41,25 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "pin.H"
 #include "instlib.H"
 #include "mpi.h"
-#include "xml_parser.h"
-#include "common.h"
 #include "core_manager.h"
 
 using namespace std;
 
 CoreManager *core_manager;
 
-KNOB<string> KnobOutputFile(KNOB_MODE_WRITEONCE, "pintool",
-    "o", "result", "specify output file name");
+KNOB<int> KnobMaxMsgSize(KNOB_MODE_WRITEONCE, "pintool",
+    "l", "1000", "specify max_msg_size");
 
-KNOB<string> KnobConfigFile(KNOB_MODE_WRITEONCE, "pintool",
-    "c", "config.xml", "specify config file name");
-
+KNOB<int> KnobNumRecvThreads(KNOB_MODE_WRITEONCE, "pintool",
+    "r", "1", "specify number of receiving threads in prime");
 
 
 // Handle non-memory instructions
-void PIN_FAST_ANALYSIS_CALL execNonMem(uint32_t ins_count, THREADID threadid)
+// void PIN_FAST_ANALYSIS_CALL execNonMem(uint32_t ins_count, THREADID threadid)
+void execNonMem(uint32_t ins_count, THREADID threadid)
 {
     core_manager->execNonMem(ins_count, threadid);
 }
-
 
 // Handle a memory instruction
 void execMem(void * addr, THREADID threadid, uint32_t size, bool mem_type)
@@ -75,7 +72,6 @@ void ThreadStart(THREADID threadid, CONTEXT *ctxt, int32_t flags, void *v)
 {
     core_manager->threadStart(threadid, ctxt, flags, v);
 }
-
 
 // This routine is executed every time a thread is destroyed.
 void ThreadFini(THREADID threadid, const CONTEXT *ctxt, int32_t code, void *v)
@@ -99,14 +95,10 @@ void SyscallExit(THREADID threadIndex, CONTEXT *ctxt, SYSCALL_STANDARD std, void
 // Pin calls this function every time a new basic block is encountered
 void Trace(TRACE trace, void *v)
 {
-    uint32_t nonmem_count;
-
     // Visit every basic block  in the trace
     for (BBL bbl = TRACE_BblHead(trace); BBL_Valid(bbl); bbl = BBL_Next(bbl)) {
-
-        nonmem_count = 0;
-        INS ins = BBL_InsHead(bbl);
-        for (; INS_Valid(ins); ins = INS_Next(ins)) {
+        uint32_t nonmem_count = 0;
+        for (INS ins = BBL_InsHead(bbl); INS_Valid(ins); ins = INS_Next(ins)) {
 
             // Instruments memory accesses using a predicated call, i.e.
             // the instrumentation is called iff the instruction will actually be executed.
@@ -129,7 +121,7 @@ void Trace(TRACE trace, void *v)
                             IARG_MEMORYOP_EA, memOp,
                             IARG_THREAD_ID,
                             IARG_UINT32, size,
-                            IARG_BOOL, RD,
+                            IARG_BOOL, 0,
                             IARG_END);
 
                     }
@@ -139,33 +131,44 @@ void Trace(TRACE trace, void *v)
                             IARG_MEMORYOP_EA, memOp,
                             IARG_THREAD_ID,
                             IARG_UINT32, size,
-                            IARG_BOOL, WR,
+                            IARG_BOOL, 1,
                             IARG_END);
                     }
                 }
             }
             else {
                 nonmem_count++;
+                // INS_InsertPredicatedCall(
+                //     ins, IPOINT_BEFORE, (AFUNPTR)execNonMem, 
+                //     IARG_UINT32, 1, 
+                //     IARG_THREAD_ID, 
+                //     IARG_END
+                // );
             }
         }
         // Insert a call to execNonMem before every bbl, passing the number of nonmem instructions
         BBL_InsertCall(bbl, IPOINT_BEFORE, (AFUNPTR)execNonMem, IARG_FAST_ANALYSIS_CALL, 
-                       IARG_UINT32, nonmem_count, IARG_THREAD_ID, IARG_END);
+                      IARG_UINT32, nonmem_count, 
+                      IARG_THREAD_ID, 
+                      IARG_END);
 
     } // End Ins For
-
 }
 
 
 
 void Start(void *v)
 {
+    core_manager = new CoreManager;
+    core_manager->init(KnobMaxMsgSize.Value(), KnobNumRecvThreads.Value());
+    core_manager->startSim();
 }
 
 void Fini(int32_t code, void *v)
 {
     core_manager->finishSim(code, v);
     delete core_manager;
+    MPI_Finalize();
 }
 
 
@@ -187,9 +190,12 @@ int32_t Usage()
 
 int main(int argc, char *argv[])
 {
-    //Link to the OpenMPI library
+    // Link to the OpenMPI library
     dlopen(OPENMPI_PATH, RTLD_NOW | RTLD_GLOBAL);
-    int prov, rc;
+
+    int prov = 0, rc = 0;
+    if (PIN_Init(argc, argv)) return Usage();
+
     rc = MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &prov);
     if (rc != MPI_SUCCESS) {
         cerr << "Error starting MPI program. Terminating.\n";
@@ -199,31 +205,8 @@ int main(int argc, char *argv[])
         cerr << "Provide level of thread supoort is not required: " << prov << endl;
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
-    MPI_Comm prime_comm;
-    rc = MPI_Comm_dup(MPI_COMM_WORLD, &prime_comm);
-    if (rc != MPI_SUCCESS) {
-        cerr << "Couldn't create new communicator. Terminating.\n";
-        MPI_Abort(MPI_COMM_WORLD, rc);
-    }
     
-    if (PIN_Init(argc, argv)) return Usage();
-
-    XmlParser xml_parser;
-
-    if(!xml_parser.parse(KnobConfigFile.Value().c_str())) {
-        cerr<< "XML file parse error!\n";
-        MPI_Abort(MPI_COMM_WORLD, -1);
-        return -1;
-    }
-    XmlSim* xml_sim = xml_parser.getXmlSim();
-
     PIN_InitSymbols();
-
-    core_manager = new CoreManager;
-    core_manager->init(xml_sim, prime_comm);
-
- 
-    // Register Instruction to be called to instrument instructions
     TRACE_AddInstrumentFunction(Trace, 0);
     PIN_AddSyscallEntryFunction(SyscallEntry, 0);
     PIN_AddSyscallExitFunction(SyscallExit, 0);
@@ -231,10 +214,7 @@ int main(int argc, char *argv[])
     PIN_AddThreadFiniFunction(ThreadFini, 0);   
     PIN_AddApplicationStartFunction(Start, 0);
     PIN_AddFiniFunction(Fini, 0);
-
-    core_manager->startSim();
-
     PIN_StartProgram();
-    
+
     return 0;
 }

@@ -36,16 +36,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <fstream>
 #include <sstream>
 #include <assert.h>
-#include <libxml/parser.h>
-#include <libxml/xpath.h>
+#include <libxml2/libxml/parser.h>
+#include <libxml2/libxml/xpath.h>
 
 
-typedef struct XmlCore
-{
-    xmlChar*   path;
-} XmlCore;
-
-typedef struct XmlCache
+struct XmlCache
 {
     int         level;
     int         share;
@@ -53,9 +48,9 @@ typedef struct XmlCache
     uint64_t    size;
     uint64_t    block_size;
     uint64_t    num_ways;
-} XmlCache;
+};
 
-typedef struct XmlNetwork
+struct XmlNetwork
 {
     int data_width;
     int header_flits;
@@ -63,50 +58,48 @@ typedef struct XmlNetwork
     uint64_t router_delay;
     uint64_t link_delay;
     uint64_t inject_delay;
-} XmlNetwork;
+};
 
-typedef struct XmlBus
+struct XmlBus
 {
     int bandwidth;
     bool unlim_bw;
     int ctrl_pkt_len;
     int data_pkt_len;
-} XmlBus;
+};
 
-
-
-typedef struct XmlSys
+struct XmlSys
 {
-    int        sys_type;
-    int        protocol_type;
-    int        protocol;
-    int        max_num_sharers;
-    int        page_size;
-    int        tlb_enable;
-    int        shared_llc;
-    int        verbose_report;
-    double     cpi_nonmem;
-    int        dram_access_time;
-    int        num_levels;
-    int        num_cores;
-    double     freq;
-    int        page_miss_delay;
-    XmlNetwork network;
-    XmlBus     bus;
-    XmlCache   directory_cache;
-    XmlCache   tlb_cache;
-    XmlCache*  cache;
-} XmlSys;
+    int         sys_type;
+    int         protocol_type;
+    int         protocol;
+    int         max_num_sharers;
+    int         page_size;
+    int         tlb_enable;
+    int         shared_llc;
+    int         verbose_report;
+    double      cpi_nonmem;
+    int         dram_access_time;
+    int         num_levels;
+    int         num_cores;
+    double      freq;
+    int         page_miss_delay;
+    XmlNetwork* network;
+    XmlBus*     bus;
+    XmlCache*   directory_cache;
+    XmlCache*   tlb_cache;
+    XmlCache*   cache;
+};
 
-typedef struct XmlSim
+struct XmlSim
 {
     int        max_msg_size;
-    int        num_recv_threads;
+    int        num_cons_threads;
+    int        num_prod_threads;
     int        thread_sync_interval;
-    int        proc_sync_interval;
     int        syscall_cost;
-    XmlSys     sys; 
-} XmlSim;
+    XmlSys*    sys; 
+};
 
 
 class XmlParser 
@@ -126,7 +119,7 @@ class XmlParser
         bool parse(const char *docname);
         ~XmlParser();
     private:
-        XmlSim   xml_sim;
+        XmlSim*   xml_sim;
         xmlDocPtr doc;
 };
 

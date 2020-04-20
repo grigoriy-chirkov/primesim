@@ -1,8 +1,8 @@
 //===========================================================================
-// page_table.h 
+// system.cpp simulates inclusive multi-level cache system with NoC and memory
 //===========================================================================
 /*
-Copyright (c) 2015 Princeton University
+Copyright (c) 2020 Princeton University
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -28,44 +28,51 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifndef  PAGETABLE_H
-#define  PAGETABLE_H
+#include "cache_stash.h"
+#include <algorithm>
 
-#include <string>
-#include <inttypes.h>
-#include <fstream>
-#include <stdio.h>
-#include <iostream>
-#include <cmath>
-#include <set>
-#include <map>
-#include <vector>
-#include "common.h"
-#include "cache.h"
-#include <pthread.h> 
-
-
-typedef pair<int, uint64_t> UKey;
-typedef map<UKey, uint64_t> PageMap; 
-
-
-class PageTable
+CacheStash::CacheStash(int _size) 
 {
-    public:
-        void init(int page_size_in, int delay_in);
-        uint64_t getPageId(uint64_t addr);
-        uint64_t translate(InsMem* ins_mem);
-        int getTransDelay();
-        void report(ofstream& result);
-        IntSet prog_set;
-        ~PageTable();        
-    private:
-        int page_size;
-        int delay;
-        uint64_t empty_page_num;
-        pthread_mutex_t   lock;
-        PageMap page_map;
-};
+    size = _size;
+    pthread_mutex_init(&mutex, NULL);
+}
 
+CacheStash::~CacheStash()
+{
+	pthread_mutex_destroy(&mutex);
+}
 
-#endif //PAGETABLE_H
+bool CacheStash::contains(uint64_t addr)
+{
+	pthread_mutex_lock(&mutex);
+	bool ret = (std::find(storage.begin(), storage.end(), addr) != storage.end());
+	pthread_mutex_unlock(&mutex);
+    return ret;
+}
+
+void CacheStash::insert(uint64_t addr) 
+{
+	pthread_mutex_lock(&mutex);
+	storage.push_front(addr);
+	if (storage.size() > size) {
+		storage.pop_back();
+	}
+	pthread_mutex_unlock(&mutex);
+}
+
+void CacheStash::insert_unique(uint64_t addr) 
+{
+	pthread_mutex_lock(&mutex);
+	if (!contains(addr)) 
+		insert(addr);
+	pthread_mutex_unlock(&mutex);
+}
+
+void CacheStash::eject(uint64_t addr)
+{
+	pthread_mutex_lock(&mutex);
+	auto it = std::find(storage.begin(), storage.end(), addr);
+	if (it != storage.end())
+		storage.erase(it);
+	pthread_mutex_unlock(&mutex);
+}

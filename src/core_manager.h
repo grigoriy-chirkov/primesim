@@ -31,15 +31,16 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifndef  CORE_MANAGER_H
 #define  CORE_MANAGER_H
 
+#include "portability.H"
 #include <string>
 #include <inttypes.h>
 #include <fstream>
 #include <sstream>
-#include <stdio.h>
+#include <cstdio>
 #include <iostream>
 #include <cmath>
 #include <string>
-#include "portability.H"
+#include <cassert>
 #include <syscall.h>
 #include <utmpx.h>
 #include <linux/futex.h>
@@ -47,37 +48,37 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <time.h>
 #include <dlfcn.h>
 #include "mpi.h"
-#include "pin.H"
-#include "instlib.H"
-#include "xml_parser.h"
 #include "common.h"
+
+
+#define CORE_THREAD_MAX 1024
+
+struct ThreadData {
+    uint32_t ins_nonmem = 0;
+    MPIMsg   *msgs = NULL;
+    int mpi_pos = 1;
+    ThreadState thread_state = DEAD;
+    bool valid = false;
+    int recv_thread_num = 0;
+
+    void init(int max_msg_size) {
+        valid = true;
+        thread_state = ACTIVE;
+        msgs = new MPIMsg [max_msg_size + 1];
+        assert(msgs != NULL);
+        memset(msgs, 0, (max_msg_size + 1) * sizeof(MPIMsg));
+    };
+
+    ~ThreadData() {
+        if (valid)
+            delete[] msgs;
+    };
+} __attribute__ ((aligned (64)));
 
 class CoreManager
 {
-    struct ThreadData {
-        uint64_t ins_nonmem;
-        MPIMsg   *msgs = NULL;
-        int mpi_pos = 1;
-        ThreadState thread_state = DEAD;
-        bool valid = false;
-        int recv_thread_num = 0;
-
-        void init(int max_msg_size) {
-            valid = true;
-            thread_state = ACTIVE;
-            msgs = new MPIMsg [max_msg_size + 1];
-            assert(msgs != NULL);
-            memset(msgs, 0, (max_msg_size + 1) * sizeof(MPIMsg));
-        };
-
-        ~ThreadData() {
-            if (valid)
-                delete[] msgs;
-        };
-    } __attribute__ ((aligned (64)));
-
     public:
-        void init(XmlSim* xml_sim, MPI_Comm _comm);
+        void init(int max_msg_size, int num_recv_threads);
         void startSim();
         void finishSim(int32_t code, void *v);
         void execNonMem(uint32_t ins_count_in, THREADID threadid);
@@ -93,12 +94,15 @@ class CoreManager
         void sysBefore(ADDRINT ip, ADDRINT num, ADDRINT arg0, ADDRINT arg1, ADDRINT arg2, 
                ADDRINT arg3, ADDRINT arg4, ADDRINT arg5, THREADID threadid);
         void sysAfter(ADDRINT ret, THREADID threadid);
+        void lock();
+        void unlock();
         ThreadData* thread_data;
         int syscall_count;
         int max_msg_size;
+        int num_recv_threads;
         int pid;
         MPI_Comm comm;
-        std::ofstream* out;
+        //std::ofstream* out;
         PIN_MUTEX mutex;
 };
 

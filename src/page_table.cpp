@@ -42,8 +42,7 @@ void PageTable::init(int page_size_in, int delay_in)
     delay = delay_in;
     empty_page_num = 0;
     page_map.clear();
-    lock = new pthread_mutex_t;
-    pthread_mutex_init(lock, NULL);
+    pthread_mutex_init(&lock, NULL);
 }
 
 // Return page number
@@ -55,10 +54,9 @@ uint64_t PageTable::getPageId(uint64_t addr)
 //Translate virtual page number into physical page number
 uint64_t PageTable::translate(InsMem* ins_mem)
 {
-    uint64_t ppage_num;
-    PageMap::iterator it;
-    pthread_mutex_lock(lock);
-    it = page_map.find(UKey(ins_mem->pid, getPageId(ins_mem->addr_dmem)));
+    uint64_t ppage_num = 0;
+    pthread_mutex_lock(&lock);
+    auto it = page_map.find(UKey(ins_mem->pid, getPageId(ins_mem->addr_dmem)));
     if(it == page_map.end()) {
         page_map[UKey(ins_mem->pid, getPageId(ins_mem->addr_dmem))] = empty_page_num;
         ppage_num = empty_page_num;
@@ -67,7 +65,7 @@ uint64_t PageTable::translate(InsMem* ins_mem)
     else {
         ppage_num = it->second;
     }
-    pthread_mutex_unlock(lock);
+    pthread_mutex_unlock(&lock);
     return ppage_num;
 }
 
@@ -88,6 +86,5 @@ void PageTable::report(ofstream& result)
 
 PageTable::~PageTable()
 {
-    pthread_mutex_destroy(lock);
-    delete lock;
+    pthread_mutex_destroy(&lock);
 }

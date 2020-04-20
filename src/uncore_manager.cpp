@@ -36,7 +36,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <cstring>
 #include <inttypes.h>
 #include <cmath>
-#include <assert.h>
+#include <cassert>
+#include <unistd.h>
 
 #include "uncore_manager.h"
 #include "common.h"
@@ -61,18 +62,17 @@ void UncoreManager::init(const XmlSim* xml_sim)
 {
     sys = new System;
     assert(sys != NULL);
-    sys->init(&xml_sim->sys);
+    sys->init(xml_sim->sys);
     thread_sched = new ThreadSched;
     assert(thread_sched != NULL);
     thread_sched->init(getCoreCount());
 
     max_msg_size = xml_sim->max_msg_size;
-    num_cons_threads = xml_sim->num_recv_threads;
-    num_prod_threads = 64;
+    num_cons_threads = xml_sim->num_cons_threads;
+    num_prod_threads = xml_sim->num_prod_threads;
     thread_sync_interval = xml_sim->thread_sync_interval;
-    proc_sync_interval = xml_sim->proc_sync_interval;
-    cpi_nonmem = xml_sim->sys.cpi_nonmem;
-    freq = xml_sim->sys.freq;
+    cpi_nonmem = xml_sim->sys->cpi_nonmem;
+    freq = xml_sim->sys->freq;
 
     pthread_mutex_init(&mutex, NULL);
 
@@ -102,23 +102,30 @@ void UncoreManager::init(const XmlSim* xml_sim)
     MPI_Comm   barrier_comm;
     createCommWithoutUncore(comm, &barrier_comm);
 
-    segment_cnt = new std::vector<uint64_t>;
-    segment_cnt->push_back(0);
+    segment_cnt = new std::vector<int>;
+    assert(segment_cnt);
+    //segment_cnt->push_back(0);
 
     // in = new ifstream("/scratch/gpfs/gchirkov/dump.txt", ios::binary);
     // assert(in != NULL);
 }
 
 
-void UncoreManager::msgProducer(int my_tid) {
-    pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
-
+void UncoreManager::msgProducer(int my_tid) 
+{
     MPIMsg* inbuffer = new MPIMsg[max_msg_size + 1];
     assert(inbuffer != NULL);
     memset(inbuffer, 0, sizeof(MPIMsg)*(max_msg_size + 1));
     auto& msg = inbuffer[0];
     
     while(1) {
+        int msg_here = 0;
+        while (!msg_here) {
+            MPI_Iprobe(MPI_ANY_SOURCE, my_tid, comm, &msg_here, MPI_STATUS_IGNORE);
+            if (!msg_here) {
+                usleep(1);
+            }
+        }
         MPI_Recv(inbuffer, (max_msg_size+1) * sizeof(MPIMsg), MPI_CHAR, MPI_ANY_SOURCE, my_tid, comm, MPI_STATUS_IGNORE);
 
         //in->read((char*) inbuffer, sizeof(MPIMsg));
@@ -140,30 +147,39 @@ void UncoreManager::msgProducer(int my_tid) {
                     cerr << "Not enough cores for process " << msg.pid << " thread " << msg.tid << endl;
                     unlock();
                     MPI_Abort(MPI_COMM_WORLD, -1);
-                    exit(-1);
                 } 
-                unlock();
                 auto& cdata = core_data[cid];
                 cdata.init(cid, msg.pid, msg.tid, getCycle(), max_msg_size);
+                int recv_thread_num = cid % num_prod_threads;
+                MPI_Send(&recv_thread_num, 1, MPI_INT, msg.pid, msg.tid, comm);
+                unlock();
                 cdata.insert_msg(inbuffer, msg.payload_len);
                 break;
+            }
+            case TERMINATE: {
+                delete[] inbuffer;
+                pthread_exit(NULL);
             }
             default: {
                 lock();
                 int cid = getCoreId(msg.pid, msg.tid);
                 unlock();
                 auto& cdata = core_data[cid];
+                assert(cdata.finished != true || msg.message_type != MEM_REQUESTS);
                 cdata.insert_msg(inbuffer, msg.payload_len);
                 break;
             }
         }
+
     }
 }
 
-void UncoreManager::msgConsumer(int my_tid) {
-    const uint64_t batch_size = 100;
+void UncoreManager::msgConsumer(int my_tid) 
+{
+    const uint64_t batch_size = 10;
 
     MPIMsg* msg_buffer = new MPIMsg[batch_size];
+    assert(msg_buffer != NULL);
     memset(msg_buffer, 0, sizeof(MPIMsg)*batch_size);
 
     while (1) {
@@ -172,10 +188,8 @@ void UncoreManager::msgConsumer(int my_tid) {
             if (!cdata.valid)
                 continue;
 
-            if (cdata.segment > cur_segment) {
-                 // cout << cid << " " << cdata.segment << "  " << cur_segment << " " << segment_cnt->at(cur_segment) << " " << num_threads_live << endl << flush;
+            if (cdata.segment > cur_segment) 
                 continue;
-            }
 
             uint64_t msg_num = cdata.eject_msg(msg_buffer, batch_size);
             if (msg_num == 0) 
@@ -183,13 +197,12 @@ void UncoreManager::msgConsumer(int my_tid) {
 
             for (uint64_t i = 0; i < msg_num; i++) {
                 MPIMsg& msg = msg_buffer[i];
+
                 if (msg.is_control) {
                     switch (msg.message_type) {
                         case PROCESS_FINISHING: {
                             lock();
                             proc_num--;
-                            if (proc_num == 0) 
-                                simulation_finished = true;
                             cout << "[PriME] Pin process " << msg.pid << " finishes"<<endl;
                             unlock();
                             break;
@@ -197,39 +210,37 @@ void UncoreManager::msgConsumer(int my_tid) {
                         case NEW_THREAD: {
                             lock();
                             num_threads_live++;
+                            // cout << num_threads_live << endl;
                             cout << "[PriME] Pin thread " << msg.tid << " from process " << msg.pid << " begins in core " << cid << endl;
                             unlock();
-                            int recv_thread_num = cid % num_prod_threads;
-                            MPI_Send(&recv_thread_num, 1, MPI_INT, msg.pid, msg.tid, comm);
                             break;
                         }
                         case THREAD_FINISHING: {
                             lock();
-                            deallocCore(msg.pid, msg.tid);   
                             num_threads_live--;
+                            // cout << num_threads_live << endl;
+                            //assert(cdata.count == 0);
+                            cdata.finished = true;
                             cout << "[PriME] Thread " << msg.tid << " from process " << msg.pid << " finishes" << endl;
                             unlock();
                             break;
                         }
                         case THREAD_LOCK:{
                             lock();
-                            //num_threads_live--;
-                            cout << "[PriME] Thread " << msg.tid << " from process " << msg.pid << " locks" << endl;
+                            num_threads_live--;
+                            // cout << num_threads_live << endl;
                             unlock();
                             break;
                         }
                         case THREAD_UNLOCK: {
                             lock();
                             cdata.cycle = getCycle();
-                            //num_threads_live++;
-                            cout << "[PriME] Thread " << msg.tid << " from process " << msg.pid << " unlocks" << endl;
+                            num_threads_live++;
+                            // cout << num_threads_live << endl;
                             unlock();
                             break;
                         }
                         case MEM_REQUESTS: {
-                            // lock();
-                            // cout << "[PriME] Thread " << msg.tid << " from process " << msg.pid << " makes " << msg.payload_len-1 << " memory requests " << endl;
-                            // unlock();
                             break;
                         }
                         default:{
@@ -238,7 +249,6 @@ void UncoreManager::msgConsumer(int my_tid) {
                             //exit(-1);
                         }
                     }
-                    assert(num_threads_live >= 0);
                 } 
                 else {
                     InsMem ins_mem;
@@ -262,43 +272,48 @@ void UncoreManager::msgConsumer(int my_tid) {
             }
 
             uint64_t new_seg = cdata.cycle / thread_sync_interval;
-
-            reserveSegmentCntSpace(new_seg);
-            for (uint64_t i = cdata.segment; i < new_seg; i++) {
+            if (new_seg > cdata.segment) {
                 lock();
-                segment_cnt->at(i) += 1;
-                unlock();
+                reserveSegmentCntSpace(new_seg);
+                for (uint64_t i = cdata.segment; i < new_seg; i++) {
+                    // lock();
+                    segment_cnt->at(i) += 1;
+                    // unlock();
+                }
+                unlock();                
             }
             cdata.segment = new_seg;
         }
 
+        if (num_threads_live == 0 && proc_num == 0 && cur_segment > 0) {
+            delete [] msg_buffer; 
+            pthread_exit(NULL);
+        }
+
+        lock();
         reserveSegmentCntSpace(cur_segment);
         if (segment_cnt->at(cur_segment) >= max(num_threads_live, 1)) {
-            lock();
-            if (segment_cnt->at(cur_segment) >= num_threads_live) {
+            // lock();
+            // if (segment_cnt->at(cur_segment) >= num_threads_live) {
                 cur_segment++;
                 if (cur_segment % 10 == 0)
                     cout << "[PriME] Segment " << cur_segment << " finished" << endl;
-            }
-            unlock();
+            // }
+            // unlock();
         }
-
-        if (simulation_finished) {
-            delete[] msg_buffer;
-            pthread_exit(NULL);
-        }
+        unlock();
     }
 }
 
 void UncoreManager::reserveSegmentCntSpace(uint64_t num) 
 {
-    if (segment_cnt->size() <= num+1) {
-        lock();
+    // if (segment_cnt->size() <= num+1) {
+        // lock();
         if (segment_cnt->size() <= num+1) {
             segment_cnt->resize(2*num+1, 0);
         }
-        unlock();
-    }
+        // unlock();
+    // }
 }
 
 
@@ -320,12 +335,6 @@ void UncoreManager::getSimFinishTime()
 int UncoreManager::allocCore(int pid, int tid)
 {
     return thread_sched->allocCore(pid, tid);
-}
-
-
-int UncoreManager::deallocCore(int pid, int tid)
-{
-    return thread_sched->deallocCore(pid, tid);
 }
 
 
@@ -373,10 +382,7 @@ void UncoreManager::report(const char* result_basename)
     result_ofstream << "Total memory instructions: "<< total_mem_ins_count <<endl;
     result_ofstream << "Total non-memory instructions: "<< total_nonmem_ins_count <<endl;
     
-
     //result_ofstream << "System call count : " << syscall_count <<endl;
-
-
     for(int i = 0; i < getCoreCount(); i++) {
         if (core_data[i].valid)
             core_data[i].report(result_ofstream);
@@ -442,6 +448,11 @@ void UncoreManager::spawn_threads()
 
 void UncoreManager::collect_threads() 
 {
+    MPIMsg term_msg;
+    term_msg.is_control = true;
+    term_msg.message_type = TERMINATE;
+    term_msg.payload_len = 1;
+    
     void *status;
     for(int t = 0; t < num_cons_threads; t++) { 
         int rc = pthread_join(consumers[t].handle, &status);
@@ -454,15 +465,15 @@ void UncoreManager::collect_threads()
     }
 
     for(int t = 0; t < num_prod_threads; t++) { 
-        int rc = pthread_cancel(producers[t].handle);
+        MPI_Send(&term_msg, sizeof(MPIMsg), MPI_CHAR, 0, t, comm);
+        int rc = pthread_join(producers[t].handle, &status);
         if (rc) {
-            cerr << "Error return code from pthread_cancel(): " << rc << endl;
+            cerr << "Error return code from pthread_join(): " << rc << endl;
             MPI_Abort(MPI_COMM_WORLD, -1);
             // exit(-1);
         }
-        cout << "[PriME] Main: stopped producer thread " << t << endl;
+        cout << "[PriME] Main: completed join with producer thread " << t << " having a status of "<< status << endl;
     }
-
     getSimFinishTime();
 }
 
@@ -488,7 +499,9 @@ int UncoreManager::getProcId(int cid)
     return thread_sched->getProcId(cid);
 }
 
-void CoreData::init(int _cid, int _pid, int _tid, uint64_t _cycle, int max_msg_size) {
+void CoreData::init(int _cid, int _pid, int _tid, uint64_t _cycle, int max_msg_size) 
+{
+    const int BUF_SIZE = 2;
     max_count = (max_msg_size + 1) * BUF_SIZE;
     msgs = new MPIMsg[max_count];
     assert(msgs != NULL);
@@ -504,7 +517,8 @@ void CoreData::init(int _cid, int _pid, int _tid, uint64_t _cycle, int max_msg_s
     pthread_cond_init(&can_produce, NULL);
 };
 
-CoreData::~CoreData() {
+CoreData::~CoreData() 
+{
     if (valid) {
         delete [] msgs;
         pthread_mutex_destroy(&mutex);
@@ -513,7 +527,8 @@ CoreData::~CoreData() {
 }
 
 
-void CoreData::insert_msg(const MPIMsg* inbuffer, size_t num) {
+void CoreData::insert_msg(const MPIMsg* inbuffer, size_t num) 
+{
     pthread_mutex_lock(&mutex);
     while(count + num >= max_count) { // full
     // wait until some elements are consumed
@@ -534,7 +549,8 @@ void CoreData::insert_msg(const MPIMsg* inbuffer, size_t num) {
     pthread_mutex_unlock(&mutex);
 }
 
-size_t CoreData::eject_msg(MPIMsg* outbuffer, size_t num) {
+size_t CoreData::eject_msg(MPIMsg* outbuffer, size_t num) 
+{
     pthread_mutex_lock(&mutex);
     if (count == 0) {
         pthread_mutex_unlock(&mutex);
@@ -558,7 +574,13 @@ size_t CoreData::eject_msg(MPIMsg* outbuffer, size_t num) {
     return out_num;
 }
 
-void CoreData::report(ofstream& report_ofstream) {
+size_t CoreData::empty_slots()
+{
+    return max_count - count;
+}
+
+void CoreData::report(ofstream& report_ofstream) 
+{
     uint64_t ins_count = ins_mem + ins_nonmem;
     uint64_t cycle_count = nonmem_cycles + mem_cycles;
     report_ofstream << "---------------------------------------------------------\n";

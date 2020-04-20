@@ -46,9 +46,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "uncore_manager.h"
 #include "xml_parser.h"
 #include "common.h"
-#include "system.h"
 #include "prime.h"
-
 
 using namespace std;
 
@@ -56,36 +54,40 @@ int main(int argc, char *argv[])
 {
     int rc, prov = 0;
     rc = MPI_Init_thread(&argc,&argv, MPI_THREAD_MULTIPLE, &prov);
+
     if (rc != MPI_SUCCESS) {
         cerr << "Error starting MPI program. Terminating." << endl;
         MPI_Abort(MPI_COMM_WORLD, rc);
     }
     if(prov != MPI_THREAD_MULTIPLE) {
-        cerr << "Provide level of thread supoort is not required: " << prov << endl;
+        cerr << "Provide level of thread support is not required: " << prov << endl;
         MPI_Abort(MPI_COMM_WORLD, rc);
     }
 
     if(argc != 3) {
         cerr<<"usage: "<< argv[0] <<" config_file output_file\n";
-        cerr<<"argc is:" << argc <<endl;
         MPI_Abort(MPI_COMM_WORLD, -1);
         return -1;
     }
 
-    XmlParser xml_parser;
-    if( !xml_parser.parse(argv[1]) ) {
+    XmlParser* xml_parser = new XmlParser;
+    assert(xml_parser != NULL);
+    if( !xml_parser->parse(argv[1]) ) {
         cerr<< "XML file parse error!\n";
         MPI_Abort(MPI_COMM_WORLD, -1);
         return -1;
     }
-    const XmlSim* xml_sim = xml_parser.getXmlSim();
+    const XmlSim* xml_sim = xml_parser->getXmlSim();
 
     UncoreManager* uncore_manager = new UncoreManager;
+    assert(uncore_manager != NULL);
     uncore_manager->init(xml_sim);
     uncore_manager->spawn_threads();
     uncore_manager->collect_threads();
     uncore_manager->report(argv[2]);
     delete uncore_manager;
+
+    delete xml_parser;
 
     MPI_Finalize();
 }

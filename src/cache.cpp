@@ -83,13 +83,7 @@ void Cache::init(const XmlCache* xml_cache, Bus* bus_in, CacheType cache_type_in
             pthread_mutex_init(&lock_down[i], NULL);
             line[i] = new Line [num_ways];
             for (uint64_t j = 0; j < num_ways; j++ ) {
-                line[i][j].state = I;
-                line[i][j].id = 0;
-                line[i][j].set_num = i;
-                line[i][j].way_num = j;
-                line[i][j].tag = 0;
-                line[i][j].ppage_num = 0;
-                line[i][j].timestamp = 0;
+                line[i][j].init(i, j);
             }
         }
     }
@@ -98,13 +92,7 @@ void Cache::init(const XmlCache* xml_cache, Bus* bus_in, CacheType cache_type_in
         for (uint64_t i = 0; i < num_sets; i++ ) {
             line[i] = new Line [num_ways];
             for (uint64_t j = 0; j < num_ways; j++ ) {
-                line[i][j].state = I;
-                line[i][j].id = 0;
-                line[i][j].set_num = i;
-                line[i][j].way_num = j;
-                line[i][j].tag = 0;
-                line[i][j].ppage_num = 0;
-                line[i][j].timestamp = 0;
+                line[i][j].init(i, j);
             }
         }
     }
@@ -122,17 +110,6 @@ Line* Cache::findSet(int index)
 {
     assert(index >= 0 && index < (int)num_sets);
     return line[index];
-}
-
-int Cache::reverseBits(int num, int size)
-{
-    int reverse_num = 0;
-    for (int i = 0; i < size; i++) {
-        if((num & (1 << i))) {
-           reverse_num |= 1 << ((size - 1) - i);  
-        }
-   }
-   return reverse_num;
 }
 
 // This function parses each memory reference address into three separate parts
@@ -162,11 +139,10 @@ void Cache::addrCompose(Addr* addr_in, uint64_t* addr_out)
 
 int Cache::lru(uint64_t index)
 {
-    uint64_t i; 
     int min_time = 0;
     Line* set_cur = findSet(index);
     assert(set_cur != NULL);
-    for (i = 1; i < num_ways; i++) {
+    for (uint64_t i = 1; i < num_ways; i++) {
         if (set_cur[i].timestamp < set_cur[min_time].timestamp) {
             min_time = i;
         }
@@ -179,13 +155,12 @@ int Cache::lru(uint64_t index)
 // NULL is returned upon a cache miss.
 Line* Cache::accessLine(InsMem* ins_mem)
 {
-    uint64_t i;
     Line* set_cur;
     Addr addr_temp;
     addrParse(ins_mem->addr_dmem, &addr_temp);
     set_cur = findSet(addr_temp.index);
     assert(set_cur != NULL);
-    for (i = 0; i < num_ways; i++) {
+    for (uint64_t i = 0; i < num_ways; i++) {
         if( (set_cur[i].id == ins_mem->pid)
         &&  (set_cur[i].tag == addr_temp.tag)
         &&   set_cur[i].state) {
@@ -202,12 +177,11 @@ Line* Cache::replaceLine(InsMem* ins_mem_old, InsMem* ins_mem)
     Addr addr_old;
     Addr addr_temp;
     int way_rp;
-    uint64_t i, addr_dmem_old;
-    Line* set_cur;
+    uint64_t addr_dmem_old;
     addrParse(ins_mem->addr_dmem, &addr_temp);
-    set_cur = findSet(addr_temp.index);
+    Line* set_cur = findSet(addr_temp.index);
     
-    for (i = 0; i < num_ways; i++) {
+    for (uint64_t i = 0; i < num_ways; i++) {
         if (set_cur[i].state == I) {
            set_cur[i].id = ins_mem->pid; 
            set_cur[i].tag = addr_temp.tag;
@@ -235,8 +209,7 @@ Line* Cache::directAccess(int set, int way, InsMem* ins_mem)
 {
     assert(set >= 0 && set < (int)num_sets);
     assert(way >= 0 && way < (int)num_ways);
-    Line* set_cur;
-    set_cur = findSet(set);
+    Line* set_cur = findSet(set);
     if (set_cur == NULL) {
         return NULL;
     }
@@ -273,8 +246,7 @@ Line* Cache::flushLine(int set, int way, InsMem* ins_mem_old)
 {
     assert(set >= 0 && set < (int)num_sets);
     assert(way >= 0 && way < (int)num_ways);
-    Line* set_cur;
-    set_cur = findSet(set);
+    Line* set_cur = findSet(set);
     if (set_cur == NULL) {
         return NULL;
     }
@@ -302,8 +274,7 @@ Line* Cache::flushLine(int set, int way, InsMem* ins_mem_old)
 
 Line* Cache::flushAddr(InsMem* ins_mem)
 {
-    Line* cur_line;
-    cur_line = accessLine(ins_mem);
+    Line* cur_line = accessLine(ins_mem);
     if (cur_line != NULL) {
         cur_line->state = I;
         cur_line->id = 0;

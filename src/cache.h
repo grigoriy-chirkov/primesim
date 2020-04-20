@@ -42,16 +42,16 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "bus.h"
 #include "common.h"
 
-typedef struct Addr
+struct Addr
 {
     uint64_t    index;
     uint64_t    tag;
     uint64_t    offset;
-} Addr;
+};
 
 
 
-typedef enum State
+enum State
 {
     I     =   0, //invalid
     S     =   1, //shared
@@ -60,43 +60,43 @@ typedef enum State
     V     =   4, //valid 
     B     =   5, //broadcast
     MS    =   6
-} State;
+};
 
-typedef enum CacheType
+enum CacheType
 {
     DATA_CACHE         = 0,
     DIRECTORY_CACHE    = 1,
     TLB_CACHE          = 2,
-} CacheType;
-
-
-
-
+};
 
 typedef set<int> IntSet;
 
-typedef struct Line
+struct Line
 {
-    char        state;
-    int         id;
+    State       state = I;
+    int         id = 0;
     int         set_num;
     int         way_num;
-    uint64_t    tag;
-    int64_t     timestamp;
-    uint64_t    ppage_num;  //only for tlb cache
+    uint64_t    tag = 0;
+    int64_t     timestamp = 0;
+    uint64_t    ppage_num = 0;  //only for tlb cache
     IntSet      sharer_set; //only for directory cache
-} Line;
+
+    void init(int _set_num, int _way_num) {
+        set_num = _set_num;
+        way_num = _way_num;
+    }
+};
 
 
 typedef map<int, Line*> LineMap;
 
 struct InsMem
 {
-    char        mem_type; // 2 means writeback, 1 means write, 0 means read
-    int         pid;
-    int         tid;
-    int         rec_tid;
-    uint64_t    addr_dmem; 
+    char        mem_type = -1; // -1 means invalid, 2 means writeback, 1 means write, 0 means read
+    int         pid = -1;
+    int         tid = -1;
+    uint64_t    addr_dmem = 0; 
 };
 
 
@@ -107,14 +107,12 @@ class Cache
         Cache*      parent;
         Cache**     child;
         Bus*        bus;
+        
         void init(const XmlCache* xml_cache, Bus* bus_in, CacheType cache_type_in, int page_size_in, int level_in, int cache_id_in);
         Line* accessLine(InsMem* ins_mem);
         Line* directAccess(int set, int way, InsMem* ins_mem);
         Line* replaceLine(InsMem* ins_mem_old, InsMem* ins_mem);
-        void flushAll();
-        Line* flushLine(int set, int way, InsMem* ins_mem_old);
-        Line* flushAddr(InsMem* ins_mem);
-        Line* findSet(int index);
+
         void incInsCount();
         void incMissCount();
         void incEvictCount();
@@ -124,23 +122,30 @@ class Cache
         void lockDown(InsMem* ins_mem);
         void unlockDown(InsMem* ins_mem);
         int  getAccessTime();
-        uint64_t getSize();
-        uint64_t getNumSets();
-        uint64_t getNumWays();
-        uint64_t getBlockSize();
-        int getOffsetBits();
-        int getIndexBits();
+
+
         uint64_t getInsCount();
         uint64_t getMissCount();
         uint64_t getEvictCount();
         uint64_t getWbCount();
-        void addrParse(uint64_t addr_in, Addr* addr_out);
-        void addrCompose(Addr* addr_in, uint64_t* addr_out);
-        int lru(uint64_t index);
+
         void report(ofstream& result);
         ~Cache();
     private:
-        int reverseBits(int num, int size);
+        Line* findSet(int index);
+        int lru(uint64_t index);
+        void addrParse(uint64_t addr_in, Addr* addr_out);
+        void addrCompose(Addr* addr_in, uint64_t* addr_out);
+        int getOffsetBits();
+        int getIndexBits();
+        uint64_t getSize();
+        uint64_t getNumSets();
+        uint64_t getNumWays();
+        uint64_t getBlockSize();
+        void flushAll();
+        Line* flushLine(int set, int way, InsMem* ins_mem_old);
+        Line* flushAddr(InsMem* ins_mem);
+
         Line              **line;
         pthread_mutex_t   *lock_up;
         pthread_mutex_t   *lock_down;

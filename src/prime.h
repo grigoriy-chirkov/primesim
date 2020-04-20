@@ -31,8 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifndef PRIME_H
 #define PRIME_H
 
-#include "common.h"
-#include "pthread.h"
+
 
 
 
