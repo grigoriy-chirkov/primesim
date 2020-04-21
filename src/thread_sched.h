@@ -36,13 +36,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <fstream>
 #include <sstream>
 #include <map>
-#include "xml_parser.h"
-#include "cache.h"
-#include "network.h"
-
-typedef pair<int, int> Key;
-typedef map<Key, int> CoreMap;
-
+#include <pthread.h>
 
 class ThreadSched
 {
@@ -51,11 +45,11 @@ class ThreadSched
         int allocCore(int pid, int tid);
         int getCoreId(int pid, int tid);
         int getProcId(int cid);
-        void report(ofstream& result);
         ~ThreadSched();        
     private:
-        CoreMap core_map;
-        int *core_stat;
+        int**  core_map;
+        int* core_stat;
+
         int num_cores;
         int next_empty;
 };

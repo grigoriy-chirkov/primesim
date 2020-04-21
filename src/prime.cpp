@@ -83,6 +83,7 @@ int main(int argc, char *argv[])
     assert(uncore_manager != NULL);
     uncore_manager->init(xml_sim);
     uncore_manager->spawn_threads();
+    uncore_manager->alloc_server();
     uncore_manager->collect_threads();
     uncore_manager->report(argv[2]);
     delete uncore_manager;

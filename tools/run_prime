@@ -46,7 +46,7 @@ def get_max_msg_size(config_file):
 def get_num_recv_threads(config_file):
     tree = ET.parse(config_file)
     root = tree.getroot()
-    return root.find("num_prod_threads").text
+    return root.find("system").find("num_cores").text
 
 def run_prime_slurm(config_path, output_path, progs, dry, time, cores, mem):
     config_path = os.path.abspath(config_path)
@@ -80,11 +80,11 @@ def run_prime_locally(config_path, output_path, progs, dry):
     max_msg_size = get_max_msg_size(config_path)
     num_recv_threads = get_num_recv_threads(config_path)
 
-    cmd = ['mpirun', '-genv', 'I_MPI_PMI_LIBRARY', "\" \"", '-n', '1',
-           prime_exe , config_path , output_path]
-
-    # cmd = ['mpirun', '--bind-to', 'none', '-n', '1',
+    # cmd = ['mpirun', '-genv', 'I_MPI_PMI_LIBRARY', "\" \"", '-n', '1',
     #        prime_exe , config_path , output_path]
+
+    cmd = ['mpirun', '--bind-to', 'none', '-n', '1',
+           prime_exe , config_path , output_path]
 
 
     for prog in progs:

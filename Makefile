@@ -41,8 +41,8 @@ DEP_FILES := $(CXX_FILES:src/%.cpp=dep/%.d)
 O_FILES := $(filter-out obj/core_manager.o, $(filter-out obj/pin_prime.o, $(CXX_FILES:src/%.cpp=obj/%.o)))
 PIN_O_FILES := obj/pin_prime.o obj/pin_common.o obj/core_manager.o
 
-CXX_FLAGS := -std=c++14 -Wall -Werror -Wno-unknown-pragmas -O2 -g3 $(shell xml2-config --cflags) -I$(GRAPHITE_PATH)
-LD_FLAGS := $(shell xml2-config --libs) -lz -lm -ldl -g3 -O2 -lrt -lpthread
+CXX_FLAGS := -std=c++14 -Wall -Werror -Wno-unknown-pragmas -O0 -g3 $(shell xml2-config --cflags) -I$(GRAPHITE_PATH)
+LD_FLAGS := $(shell xml2-config --libs) -lz -lm -ldl -g3 -O0 -lrt -lpthread
 
 PIN_CXX_FLAGS := $(CXX_FLAGS) -fomit-frame-pointer \
            -DBIGARRAY_MULTIPLIER=1 -DUSING_XED -fno-strict-aliasing \

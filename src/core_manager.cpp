@@ -45,18 +45,13 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 using namespace std;
 
-// ostream& operator<<(ostream& out, const MPIMsg& msg) {
-//     out << msg.is_control << " " << msg.message_type << endl;
-//     return out;
-// }
-
-void CoreManager::init(int _max_msg_size, int _num_recv_threads)
+void CoreManager::init(int _max_msg_size, int _server_tid)
 {
     int rc;
     syscall_count = 0;
 
     max_msg_size = _max_msg_size;
-    num_recv_threads = _num_recv_threads;
+    server_tid = _server_tid;
 
     rc = MPI_Comm_dup(MPI_COMM_WORLD, &comm);
     if (rc != MPI_SUCCESS) {
@@ -72,8 +67,6 @@ void CoreManager::init(int _max_msg_size, int _num_recv_threads)
     thread_data = new ThreadData[CORE_THREAD_MAX];
     assert(thread_data);
 
-    // out = new ofstream("/scratch/gpfs/gchirkov/dump.txt", ios::binary);
-    // assert(out != NULL);
     PIN_MutexInit(&mutex);
 }
 
@@ -95,10 +88,8 @@ void CoreManager::startSim()
     msg.pid = pid;
     msg.payload_len = 1;
     lock();
-    MPI_Send(&msg, sizeof(MPIMsg), MPI_CHAR, 0, tdata.recv_thread_num, comm);
+    MPI_Send(&msg, sizeof(MPIMsg), MPI_CHAR, 0, server_tid, comm);
     unlock();
-    // dumpTrace(&msg, 1);
-
 
     int barrier_rank;
     int rc = MPI_Comm_rank(barrier_comm, &barrier_rank);
@@ -148,11 +139,9 @@ void CoreManager::drainMemReqs(THREADID tid)
     msg.payload_len = tdata.mpi_pos;
 
     lock();
-    MPI_Send(tdata.msgs, (max_msg_size + 1) * sizeof(MPIMsg), MPI_CHAR, 0, tdata.recv_thread_num, comm);
+    MPI_Send(tdata.msgs, tdata.mpi_pos * sizeof(MPIMsg), MPI_CHAR, 0, tdata.cid, comm);
     unlock();
     
-    // dumpTrace(tdata.msgs, tdata.mpi_pos);
-
     tdata.mpi_pos = 1;
 }
 
@@ -173,10 +162,9 @@ void CoreManager::threadStart(THREADID tid, CONTEXT *ctxt, int32_t flags, void *
     msg.payload_len = 1;
 
     lock();
-    MPI_Send(&msg, sizeof(MPIMsg), MPI_CHAR, 0, num_recv_threads-1, comm);
-    MPI_Recv(&tdata.recv_thread_num, 1, MPI_INT, 0, tid, comm, MPI_STATUS_IGNORE);
+    MPI_Send(&msg, sizeof(MPIMsg), MPI_CHAR, 0, server_tid, comm);
+    MPI_Recv(&tdata.cid, 1, MPI_INT, 0, tid, comm, MPI_STATUS_IGNORE);
     unlock();
-    // dumpTrace(&msg, 1);
 }
 
 
@@ -198,9 +186,8 @@ void CoreManager::threadFini(THREADID tid, const CONTEXT *ctxt, int32_t code, vo
     msg.payload_len = 1;
 
     lock();
-    MPI_Send(&msg, sizeof(MPIMsg), MPI_CHAR, 0, tdata.recv_thread_num, comm);
+    MPI_Send(&msg, sizeof(MPIMsg), MPI_CHAR, 0, tdata.cid, comm);
     unlock();
-    // dumpTrace(&msg, 1);
 }
 
 
@@ -245,9 +232,8 @@ void CoreManager::sysBefore(ADDRINT ip, ADDRINT num, ADDRINT arg0, ADDRINT arg1,
             msg.pid = pid;
             msg.payload_len = 1;
             lock();
-            MPI_Send(&msg, sizeof(MPIMsg), MPI_CHAR, 0, tdata.recv_thread_num, comm);
+            MPI_Send(&msg, sizeof(MPIMsg), MPI_CHAR, 0, tdata.cid, comm);
             unlock();
-            // dumpTrace(&msg, 1);
         }
     }
     syscall_count++;
@@ -266,9 +252,8 @@ void CoreManager::sysAfter(ADDRINT ret, THREADID tid)
         msg.pid = pid;
         msg.payload_len = 1;
         lock();
-        MPI_Send(&msg, sizeof(MPIMsg), MPI_CHAR, 0, tdata.recv_thread_num, comm);
+        MPI_Send(&msg, sizeof(MPIMsg), MPI_CHAR, 0, tdata.cid, comm);
         unlock();
-        // dumpTrace(&msg, 1);
     }
 }
 
@@ -288,12 +273,12 @@ void CoreManager::syscallEntry(THREADID threadIndex, CONTEXT *ctxt, SYSCALL_STAN
 
 void CoreManager::lock() 
 {
-    PIN_MutexLock(&mutex);
+    //PIN_MutexLock(&mutex);
 }
 
 void CoreManager::unlock()
 {
-    PIN_MutexUnlock(&mutex);
+//    PIN_MutexUnlock(&mutex);
 }
 
 // Exit a syscall
@@ -313,22 +298,14 @@ void CoreManager::finishSim(int32_t code, void *v)
     msg.pid = pid;
 
     lock();
-    MPI_Send(&msg, sizeof(MPIMsg), MPI_CHAR, 0, tdata.recv_thread_num, comm);
+    MPI_Send(&msg, sizeof(MPIMsg), MPI_CHAR, 0, server_tid, comm);
     unlock();
-    // dumpTrace(&msg, 1);
 
     PIN_MutexFini(&mutex);
     delete [] thread_data;
     MPI_Comm_free(&comm);
 }
 
-void CoreManager::dumpTrace(MPIMsg* trace, size_t num) {
-    // lock();
-    // out->write((const char*)trace, sizeof(MPIMsg) * num);
-    // unlock();
-}
-
 CoreManager::~CoreManager()
 {
-    // out->close();
 }       

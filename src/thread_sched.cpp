@@ -46,8 +46,13 @@ void ThreadSched::init(int num_cores_in)
 {
     num_cores = num_cores_in;
     core_stat = new int [num_cores];
+    assert(core_stat);
     memset(core_stat, 0, sizeof(int) * num_cores);
-    core_map.clear();
+
+    core_map = new int*[num_cores];
+    assert(core_map);
+    memset(core_map, 0, sizeof(int*) * num_cores);
+
     next_empty = 0;
 }
 
@@ -55,39 +60,33 @@ void ThreadSched::init(int num_cores_in)
 //Allocate a core for a thread
 int ThreadSched::allocCore(int pid, int tid)
 {
-    if (next_empty >= num_cores)
+    int cur_core = next_empty;
+    next_empty++;
+
+    if (cur_core >= num_cores)
         return -1;
 
-    core_stat[next_empty] = pid;
-    core_map[Key(pid, tid)] = next_empty;
-    next_empty++;
-    return next_empty-1;
+    core_stat[cur_core] = pid;
+    if (core_map[pid] == NULL) {
+        core_map[pid] = new int[num_cores];
+        assert(core_map[pid]);
+        memset(core_map[pid], -1, sizeof(int) * num_cores);
+    }
+    core_map[pid][tid] = cur_core;
+    return cur_core;
 }
-
 
 //Return the core id for the allocated thread
 int ThreadSched::getCoreId(int pid, int tid)
 {
-    return core_map[Key(pid, tid)];
+    assert(core_map[pid] != NULL);
+    return core_map[pid][tid];
 }
 
 //Return the core id for the allocated thread
 int ThreadSched::getProcId(int cid)
 {
     return core_stat[cid];
-}
-
-void ThreadSched::report(ofstream& result)
-{
-    result << "Core Allocation:\n";
-
-    for (auto pos = core_map.begin(); pos != core_map.end(); ++pos)
-    {
-        result << "(proc ID: " << pos->first.first << " ,thread ID: " <<pos->first.second << ") => "
-               << "core ID: " << pos->second << endl;
-    }
-    result<<endl;
-
 }
 
 ThreadSched::~ThreadSched()

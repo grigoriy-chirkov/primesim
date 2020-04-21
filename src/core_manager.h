@@ -59,7 +59,7 @@ struct ThreadData {
     int mpi_pos = 1;
     ThreadState thread_state = DEAD;
     bool valid = false;
-    int recv_thread_num = 0;
+    int cid = -1;
 
     void init(int max_msg_size) {
         valid = true;
@@ -78,7 +78,7 @@ struct ThreadData {
 class CoreManager
 {
     public:
-        void init(int max_msg_size, int num_recv_threads);
+        void init(int max_msg_size, int server_tid);
         void startSim();
         void finishSim(int32_t code, void *v);
         void execNonMem(uint32_t ins_count_in, THREADID threadid);
@@ -99,10 +99,9 @@ class CoreManager
         ThreadData* thread_data;
         int syscall_count;
         int max_msg_size;
-        int num_recv_threads;
+        int server_tid;
         int pid;
         MPI_Comm comm;
-        //std::ofstream* out;
         PIN_MUTEX mutex;
 };
 

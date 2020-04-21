@@ -104,12 +104,47 @@ void UncoreManager::init(const XmlSim* xml_sim)
 
     segment_cnt = new std::vector<int>;
     assert(segment_cnt);
-    //segment_cnt->push_back(0);
-
-    // in = new ifstream("/scratch/gpfs/gchirkov/dump.txt", ios::binary);
-    // assert(in != NULL);
 }
 
+void UncoreManager::alloc_server()
+{
+    MPIMsg msg;
+    memset(&msg, 0, sizeof(MPIMsg));
+
+    while (1) {
+        MPI_Recv(&msg, sizeof(MPIMsg), MPI_CHAR, MPI_ANY_SOURCE, getCoreCount(), comm, MPI_STATUS_IGNORE);
+        switch (msg.message_type) {
+            case PROCESS_STARTING: { //Receive a msg indicating a new process                
+                cout << "[PriME] Pin process " << msg.pid << " begins" << endl;
+                proc_num++;
+                break;
+            }
+            case PROCESS_FINISHING: {
+                proc_num--;
+                cout << "[PriME] Pin process " << msg.pid << " finishes"<<endl;
+                if (proc_num == 0) 
+                    return;
+                break;
+            }
+            case NEW_THREAD: {//Receive a msg indicating a new thread
+                int cid = allocCore(msg.pid, msg.tid);   
+                if (cid < 0) {
+                    cerr << "Not enough cores for process " << msg.pid << " thread " << msg.tid << endl;
+                    MPI_Abort(MPI_COMM_WORLD, -1);
+                } 
+                auto& cdata = core_data[cid];
+                cdata.init(cid, msg.pid, msg.tid, getCycle(), max_msg_size);
+                MPI_Send(&cid, 1, MPI_INT, msg.pid, msg.tid, comm);
+                cdata.insert_msg(&msg, 1);
+                break;
+            }
+            default: {
+                cerr << "Wrong msg type in allocServer from process " << msg.pid << " thread " << msg.tid << endl;
+                MPI_Abort(MPI_COMM_WORLD, -1);
+            }
+        }
+    }
+}
 
 void UncoreManager::msgProducer(int my_tid) 
 {
@@ -117,60 +152,47 @@ void UncoreManager::msgProducer(int my_tid)
     assert(inbuffer != NULL);
     memset(inbuffer, 0, sizeof(MPIMsg)*(max_msg_size + 1));
     auto& msg = inbuffer[0];
-    
-    while(1) {
-        int msg_here = 0;
-        while (!msg_here) {
-            MPI_Iprobe(MPI_ANY_SOURCE, my_tid, comm, &msg_here, MPI_STATUS_IGNORE);
-            if (!msg_here) {
-                usleep(1);
+
+    while (1) {
+        bool throttle = true;
+        for (int cid = my_tid; cid < getCoreCount(); cid += num_prod_threads) {
+            auto& cdata = core_data[cid];
+            if (!cdata.valid)
+                continue;
+
+            // Check that we have msg incoming
+            int msg_here = 0;
+            MPI_Status status;
+            MPI_Iprobe(MPI_ANY_SOURCE, cid, comm, &msg_here, &status);
+            if (!msg_here) 
+                continue;
+
+            // Check that we have place to store the message
+            int msg_size = 0;
+            MPI_Get_count(&status, MPI_CHAR, &msg_size);
+            int msg_count = msg_size / sizeof(MPIMsg);
+            if (cdata.empty_count() < msg_count)
+                continue;
+
+            // Finally receive messge
+            MPI_Recv(inbuffer, (max_msg_size+1) * sizeof(MPIMsg), MPI_CHAR, MPI_ANY_SOURCE, cid, comm, MPI_STATUS_IGNORE);
+            throttle = false;
+
+            switch (msg.message_type) {
+                case TERMINATE: {
+                    delete[] inbuffer;
+                    pthread_exit(NULL);
+                }
+                default: {
+                    assert(cdata.finished != true || msg.message_type != MEM_REQUESTS);
+                    cdata.insert_msg(inbuffer, msg.payload_len);
+                    break;
+                }
             }
         }
-        MPI_Recv(inbuffer, (max_msg_size+1) * sizeof(MPIMsg), MPI_CHAR, MPI_ANY_SOURCE, my_tid, comm, MPI_STATUS_IGNORE);
-
-        //in->read((char*) inbuffer, sizeof(MPIMsg));
-        //in->read((char*)(inbuffer+1), (msg.payload_len-1) * sizeof(MPIMsg));
-
-        // int pid = 1;
-        switch (msg.message_type) {
-            case PROCESS_STARTING: { //Receive a msg indicating a new process                
-                lock();
-                cout << "[PriME] Pin process " << msg.pid << " begins" << endl;
-                proc_num++;
-                unlock();
-                break;
-            }
-            case NEW_THREAD: {//Receive a msg indicating a new thread
-                lock();
-                int cid = allocCore(msg.pid, msg.tid);   
-                if (cid == -1) {
-                    cerr << "Not enough cores for process " << msg.pid << " thread " << msg.tid << endl;
-                    unlock();
-                    MPI_Abort(MPI_COMM_WORLD, -1);
-                } 
-                auto& cdata = core_data[cid];
-                cdata.init(cid, msg.pid, msg.tid, getCycle(), max_msg_size);
-                int recv_thread_num = cid % num_prod_threads;
-                MPI_Send(&recv_thread_num, 1, MPI_INT, msg.pid, msg.tid, comm);
-                unlock();
-                cdata.insert_msg(inbuffer, msg.payload_len);
-                break;
-            }
-            case TERMINATE: {
-                delete[] inbuffer;
-                pthread_exit(NULL);
-            }
-            default: {
-                lock();
-                int cid = getCoreId(msg.pid, msg.tid);
-                unlock();
-                auto& cdata = core_data[cid];
-                assert(cdata.finished != true || msg.message_type != MEM_REQUESTS);
-                cdata.insert_msg(inbuffer, msg.payload_len);
-                break;
-            }
+        if (throttle) {
+            usleep(1);
         }
-
     }
 }
 
@@ -200,17 +222,9 @@ void UncoreManager::msgConsumer(int my_tid)
 
                 if (msg.is_control) {
                     switch (msg.message_type) {
-                        case PROCESS_FINISHING: {
-                            lock();
-                            proc_num--;
-                            cout << "[PriME] Pin process " << msg.pid << " finishes"<<endl;
-                            unlock();
-                            break;
-                        }
                         case NEW_THREAD: {
                             lock();
                             num_threads_live++;
-                            // cout << num_threads_live << endl;
                             cout << "[PriME] Pin thread " << msg.tid << " from process " << msg.pid << " begins in core " << cid << endl;
                             unlock();
                             break;
@@ -218,8 +232,6 @@ void UncoreManager::msgConsumer(int my_tid)
                         case THREAD_FINISHING: {
                             lock();
                             num_threads_live--;
-                            // cout << num_threads_live << endl;
-                            //assert(cdata.count == 0);
                             cdata.finished = true;
                             cout << "[PriME] Thread " << msg.tid << " from process " << msg.pid << " finishes" << endl;
                             unlock();
@@ -228,7 +240,6 @@ void UncoreManager::msgConsumer(int my_tid)
                         case THREAD_LOCK:{
                             lock();
                             num_threads_live--;
-                            // cout << num_threads_live << endl;
                             unlock();
                             break;
                         }
@@ -236,7 +247,6 @@ void UncoreManager::msgConsumer(int my_tid)
                             lock();
                             cdata.cycle = getCycle();
                             num_threads_live++;
-                            // cout << num_threads_live << endl;
                             unlock();
                             break;
                         }
@@ -246,7 +256,6 @@ void UncoreManager::msgConsumer(int my_tid)
                         default:{
                             cerr<< "Wrong message type "<<msg.message_type<<endl;
                             MPI_Abort(MPI_COMM_WORLD, -1);
-                            //exit(-1);
                         }
                     }
                 } 
@@ -276,9 +285,7 @@ void UncoreManager::msgConsumer(int my_tid)
                 lock();
                 reserveSegmentCntSpace(new_seg);
                 for (uint64_t i = cdata.segment; i < new_seg; i++) {
-                    // lock();
                     segment_cnt->at(i) += 1;
-                    // unlock();
                 }
                 unlock();                
             }
@@ -293,13 +300,9 @@ void UncoreManager::msgConsumer(int my_tid)
         lock();
         reserveSegmentCntSpace(cur_segment);
         if (segment_cnt->at(cur_segment) >= max(num_threads_live, 1)) {
-            // lock();
-            // if (segment_cnt->at(cur_segment) >= num_threads_live) {
                 cur_segment++;
                 if (cur_segment % 10 == 0)
                     cout << "[PriME] Segment " << cur_segment << " finished" << endl;
-            // }
-            // unlock();
         }
         unlock();
     }
@@ -307,13 +310,9 @@ void UncoreManager::msgConsumer(int my_tid)
 
 void UncoreManager::reserveSegmentCntSpace(uint64_t num) 
 {
-    // if (segment_cnt->size() <= num+1) {
-        // lock();
-        if (segment_cnt->size() <= num+1) {
-            segment_cnt->resize(2*num+1, 0);
-        }
-        // unlock();
-    // }
+    if (segment_cnt->size() <= num+1) {
+        segment_cnt->resize(2*num+1, 0);
+    }
 }
 
 
@@ -429,7 +428,6 @@ void UncoreManager::spawn_threads()
         if (rc) {
             cerr << "Error return code from pthread_create(): " << rc << endl;
             MPI_Abort(MPI_COMM_WORLD, -1);
-            // exit(-1);
         }
     }
 
@@ -441,7 +439,6 @@ void UncoreManager::spawn_threads()
         if (rc) {
             cerr << "Error return code from pthread_create(): " << rc << endl;
             MPI_Abort(MPI_COMM_WORLD, -1);
-            // exit(-1);
         }
     } 
 }
@@ -459,7 +456,6 @@ void UncoreManager::collect_threads()
         if (rc) {
             cerr << "Error return code from pthread_join(): " << rc << endl;
             MPI_Abort(MPI_COMM_WORLD, -1);
-            // exit(-1);
         }
         cout << "[PriME] Main: completed join with consumer thread " << t << " having a status of "<< status << endl;
     }
@@ -470,7 +466,6 @@ void UncoreManager::collect_threads()
         if (rc) {
             cerr << "Error return code from pthread_join(): " << rc << endl;
             MPI_Abort(MPI_COMM_WORLD, -1);
-            // exit(-1);
         }
         cout << "[PriME] Main: completed join with producer thread " << t << " having a status of "<< status << endl;
     }
@@ -501,7 +496,7 @@ int UncoreManager::getProcId(int cid)
 
 void CoreData::init(int _cid, int _pid, int _tid, uint64_t _cycle, int max_msg_size) 
 {
-    const int BUF_SIZE = 2;
+    const int BUF_SIZE = 10;
     max_count = (max_msg_size + 1) * BUF_SIZE;
     msgs = new MPIMsg[max_count];
     assert(msgs != NULL);
@@ -530,7 +525,7 @@ CoreData::~CoreData()
 void CoreData::insert_msg(const MPIMsg* inbuffer, size_t num) 
 {
     pthread_mutex_lock(&mutex);
-    while(count + num >= max_count) { // full
+    while(count + num > max_count) { // full
     // wait until some elements are consumed
         pthread_cond_wait(&can_produce, &mutex);
     }
@@ -574,7 +569,7 @@ size_t CoreData::eject_msg(MPIMsg* outbuffer, size_t num)
     return out_num;
 }
 
-size_t CoreData::empty_slots()
+size_t CoreData::empty_count()
 {
     return max_count - count;
 }
