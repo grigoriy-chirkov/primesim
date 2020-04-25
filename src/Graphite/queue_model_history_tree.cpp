@@ -4,6 +4,8 @@
 
 #include "queue_model_history_tree.h"
 
+using namespace std;
+
 #define PAIR(x_,y_)  (std::make_pair(x_,y_))
 
 QueueModelHistoryTree::QueueModelHistoryTree(UInt64 min_processing_time)

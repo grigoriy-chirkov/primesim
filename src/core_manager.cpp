@@ -38,7 +38,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <cstring>
 #include <inttypes.h>
 #include <cmath>
-#include <assert.h>
+#include <cassert>
 
 #include "common.h"
 #include "core_manager.h"
@@ -161,10 +161,8 @@ void CoreManager::threadStart(THREADID tid, CONTEXT *ctxt, int32_t flags, void *
     msg.pid = pid;
     msg.payload_len = 1;
 
-    lock();
     MPI_Send(&msg, sizeof(MPIMsg), MPI_CHAR, 0, server_tid, comm);
     MPI_Recv(&tdata.cid, 1, MPI_INT, 0, tid, comm, MPI_STATUS_IGNORE);
-    unlock();
 }
 
 
@@ -185,9 +183,7 @@ void CoreManager::threadFini(THREADID tid, const CONTEXT *ctxt, int32_t code, vo
     msg.pid = pid;
     msg.payload_len = 1;
 
-    lock();
     MPI_Send(&msg, sizeof(MPIMsg), MPI_CHAR, 0, tdata.cid, comm);
-    unlock();
 }
 
 
@@ -273,12 +269,12 @@ void CoreManager::syscallEntry(THREADID threadIndex, CONTEXT *ctxt, SYSCALL_STAN
 
 void CoreManager::lock() 
 {
-    //PIN_MutexLock(&mutex);
+    // PIN_MutexLock(&mutex);
 }
 
 void CoreManager::unlock()
 {
-//    PIN_MutexUnlock(&mutex);
+   // PIN_MutexUnlock(&mutex);
 }
 
 // Exit a syscall
@@ -296,10 +292,7 @@ void CoreManager::finishSim(int32_t code, void *v)
     msg.payload_len = 1;
     msg.tid = 0;
     msg.pid = pid;
-
-    lock();
     MPI_Send(&msg, sizeof(MPIMsg), MPI_CHAR, 0, server_tid, comm);
-    unlock();
 
     PIN_MutexFini(&mutex);
     delete [] thread_data;

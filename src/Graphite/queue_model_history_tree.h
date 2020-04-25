@@ -17,7 +17,7 @@ public:
 private:
    void allocateMemory();
    void releaseMemory();
-   IntervalTree::Node* allocateNode(pair<UInt64,UInt64> interval);
+   IntervalTree::Node* allocateNode(std::pair<UInt64,UInt64> interval);
    void releaseNode(IntervalTree::Node* node);
 
    // Private Fields

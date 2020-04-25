@@ -36,8 +36,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "queue_model.h"
 #include "xml_parser.h"
 
-using namespace std;
-
 class Bus
 {
     public:

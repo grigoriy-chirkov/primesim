@@ -12,8 +12,6 @@
 #include "fixed_types.h"
 #include "modulo_num.h"
 
-using namespace std;
-
 template <class T>
 class MovingAverage
 {
@@ -29,12 +27,12 @@ class MovingAverage
       MovingAverage(UInt32 max_window_size);
       virtual ~MovingAverage();
 
-      static MovingAverage<T>* createAvgType(string avg_type, UInt32 max_window_size);
+      static MovingAverage<T>* createAvgType(std::string avg_type, UInt32 max_window_size);
 
       virtual T compute(T next_num) { return (T) 0; }
 
    protected:
-      vector<T> _num_list;
+      std::vector<T> _num_list;
       UInt32 _max_window_size;
       ModuloNum _curr_window_front;
       ModuloNum _curr_window_back;
@@ -158,7 +156,7 @@ class MovingMedian : public MovingAverage<T>
 };
 
 template <class T>
-MovingAverage<T>* MovingAverage<T>::createAvgType(string avg_type, UInt32 max_window_size)
+MovingAverage<T>* MovingAverage<T>::createAvgType(std::string avg_type, UInt32 max_window_size)
 {
    if (avg_type == "arithmetic_mean")
       return new MovingArithmeticMean<T>(max_window_size);

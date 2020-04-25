@@ -41,11 +41,11 @@ class CacheStash
 {
 	pthread_mutex_t mutex;
 	std::list<uint64_t> storage;
-	int size = 0;
+	size_t size = 0;
 	CacheStash() {};
 
 public:
-	CacheStash(int size);
+	CacheStash(size_t size);
 	~CacheStash();
 	bool contains(uint64_t addr);
 	void insert(uint64_t addr);

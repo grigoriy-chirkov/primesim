@@ -29,12 +29,9 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-
 #include "page_table.h"
 
 using namespace std;
-
-
 
 void PageTable::init(int page_size_in, int delay_in)
 {

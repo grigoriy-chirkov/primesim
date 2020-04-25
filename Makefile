@@ -41,26 +41,35 @@ DEP_FILES := $(CXX_FILES:src/%.cpp=dep/%.d)
 O_FILES := $(filter-out obj/core_manager.o, $(filter-out obj/pin_prime.o, $(CXX_FILES:src/%.cpp=obj/%.o)))
 PIN_O_FILES := obj/pin_prime.o obj/pin_common.o obj/core_manager.o
 
-CXX_FLAGS := -std=c++14 -Wall -Werror -Wno-unknown-pragmas -O0 -g3 $(shell xml2-config --cflags) -I$(GRAPHITE_PATH)
-LD_FLAGS := $(shell xml2-config --libs) -lz -lm -ldl -g3 -O0 -lrt -lpthread
+CXX_FLAGS := -std=c++14 -Wall -Werror -Wno-unknown-pragmas -O0 $(shell xml2-config --cflags) -I$(GRAPHITE_PATH)
+LD_FLAGS :=  -O0 $(shell xml2-config --libs) -ldl -lrt -lpthread -mt_mpi
 
 PIN_CXX_FLAGS := $(CXX_FLAGS) -fomit-frame-pointer \
-           -DBIGARRAY_MULTIPLIER=1 -DUSING_XED -fno-strict-aliasing \
+           -fno-stack-protector -fno-strict-aliasing \
            -D_GLIBCXX_USE_CXX11_ABI=0 -fabi-version=2 \
+           -DBIGARRAY_MULTIPLIER=1 -DUSING_XED  \
+           -DFUND_TC_TARGETCPU=FUND_CPU_INTEL64 \
+           -DFUND_TC_HOSTCPU=FUND_CPU_INTEL64 \
+           -DFUND_TC_TARGETOS=FUND_OS_LINUX \
+           -DFUND_TC_HOSTOS=FUND_OS_LINUX \
+           -DTARGET_IA32E -DHOST_IA32E \
+           -DTARGET_LINUX \
            -I$(PINPATH)/source/tools/InstLib \
            -I$(PINPATH)/extras/xed-intel64/include \
            -I$(PINPATH)/extras/components/include \
            -I$(PINPATH)/source/include/pin \
            -I$(PINPATH)/source/include/pin/gen \
-           -fno-stack-protector -DTARGET_IA32E -DHOST_IA32E \
-           -fPIC -DTARGET_LINUX
+           -fPIC 
 
-PIN_LD_FLAGS := $(LD_FLAGS) -Wl,--hash-style=sysv -shared -Wl,-Bsymbolic \
+PIN_LD_FLAGS := -shared -Wl,--hash-style=sysv -Wl,-Bsymbolic \
            -Wl,--version-script=$(PIN_VERSION_SCRIPT)  \
+           -Wl,--as-needed \
            -L$(PINPATH)/intel64/lib \
            -L$(PINPATH)/intel64/lib-ext  \
            -L$(PINPATH)/extras/xed-intel64/lib \
-           -lpin -lxed -lpindwarf -ldl 
+           -L$(PINPATH)/intel64/runtime/glibc \
+           -fPIC \
+           $(LD_FLAGS) -lpin -lxed -lpindwarf 
            
 
 .PHONY: clean
@@ -69,7 +78,7 @@ all: $(TOP_LEVEL_PROGRAM_NAME)
 
 
 obj/pin_prime.o: src/pin_prime.cpp dep/pin_prime.d
-	$(MPICXX) -c $< -o $@ $(PIN_CXX_FLAGS) -DOPENMPI_PATH=$(OPENMPI_LIB_PATH)
+	$(MPICXX) -c $< -o $@ $(PIN_CXX_FLAGS) -DMPI_PATH=$(MPI_LIB_PATH)
 
 obj/pin_common.o: src/common.cpp dep/common.d
 	$(MPICXX) -c $< -o $@ $(PIN_CXX_FLAGS)

@@ -90,7 +90,7 @@ struct CoreData {
     void insert_msg(const MPIMsg* inbuffer, size_t num);
     size_t eject_msg(MPIMsg* outbuffer, size_t num);
     size_t empty_count();
-    void report(ofstream& report_ofstream);
+    void report(std::ofstream& report_ofstream);
 } __attribute__ ((aligned (64)));
 
 class UncoreManager

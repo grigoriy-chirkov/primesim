@@ -14,10 +14,8 @@
 #include <typeinfo>
 #include <cstdio>
 
-using namespace std;
 
-
-string myDecStr(uint64_t v, uint32_t w);
+std::string myDecStr(uint64_t v, uint32_t w);
 
 
 #define safeFDiv(x) (x ? (double) x : 1.0)
@@ -96,10 +94,10 @@ T getMax(T v1, T v2)
 // char, int, float, double
 
 template <class T>
-T convertFromString(const string& s)
+T convertFromString(const std::string& s)
 {
    T t;
-   istringstream iss(s);
+   std::istringstream iss(s);
    if ((iss >> t).fail())
    {
       fprintf(stderr, "Conversion from (std::string) -> (%s) FAILED\n", typeid(t).name());
@@ -109,18 +107,18 @@ T convertFromString(const string& s)
 }
 
 template <class T>
-string convertToString(const T& t)
+std::string convertToString(const T& t)
 {
-   ostringstream oss;
+   std::ostringstream oss;
    oss << t;
    return oss.str();
 }
 
 template <class T>
-string convertToString(const vector<T>& vec)
+std::string convertToString(const std::vector<T>& vec)
 {
-   ostringstream oss;
-   for (typename vector<T>::const_iterator it = vec.begin(); it != vec.end(); it++)
+   std::ostringstream oss;
+   for (typename std::vector<T>::const_iterator it = vec.begin(); it != vec.end(); it++)
    {
       T elem = (*it);
       oss << elem;
@@ -135,20 +133,20 @@ uint32_t convertBitsToBytes(uint32_t num_bits);
 
 // Trim the beginning and ending spaces in a string
 
-string trimSpaces(string& str);
+std::string trimSpaces(std::string& str);
 
 // Parse an arbitrary list separated by arbitrary delimiters
 // into a vector of strings
 
-void parseList(string& list, vector<string>& vec, string delim);
+void parseList(std::string& list, std::vector<std::string>& vec, std::string delim);
 
 // Split a line into tokens separated by a list of delimiters
 
-void splitIntoTokens(string line, vector<string>& tokens, const char* delimiters);
+void splitIntoTokens(std::string line, std::vector<std::string>& tokens, const char* delimiters);
 
 // Compute different statistics
-double computeMean(const vector<uint64_t>& vec);
-double computeStddev(const vector<uint64_t>& vec);
+double computeMean(const std::vector<uint64_t>& vec);
+double computeStddev(const std::vector<uint64_t>& vec);
 double computeCoefficientOfVariation(double mean, double stddev);
 
 #endif

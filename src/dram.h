@@ -45,7 +45,7 @@ class Dram
     public:
         void init(int access_delay_in);
         int  access(InsMem* ins_mem);
-        void report(ofstream& result_ofstream);
+        void report(std::ofstream& result_ofstream);
         ~Dram();        
     private:
         int access_delay;

@@ -7,6 +7,8 @@
 #include <inttypes.h>
 #include "utils.h"
 
+using namespace std;
+
 string myDecStr(uint64_t v, uint32_t w)
 {
    ostringstream o;

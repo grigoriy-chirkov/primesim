@@ -69,7 +69,7 @@ enum CacheType
     TLB_CACHE          = 2,
 };
 
-typedef set<int> IntSet;
+typedef std::set<int> IntSet;
 
 struct Line
 {
@@ -89,7 +89,7 @@ struct Line
 };
 
 
-typedef map<int, Line*> LineMap;
+typedef std::map<int, Line*> LineMap;
 
 struct InsMem
 {
@@ -129,7 +129,7 @@ class Cache
         uint64_t getEvictCount();
         uint64_t getWbCount();
 
-        void report(ofstream& result);
+        void report(std::ofstream& result);
         ~Cache();
     private:
         Line* findSet(int index);

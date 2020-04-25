@@ -41,6 +41,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "system.h"
 #include "common.h"
 
+using namespace std;
+
 void System::init(const XmlSys* xml_sys_in)
 {
     xml_sys = xml_sys_in;

@@ -42,6 +42,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "uncore_manager.h"
 #include "common.h"
 
+using namespace std;
+
 // Handle receiving MPI messages and send back responses
 void *msgProducerWrapper(void *args)
 {
@@ -170,7 +172,7 @@ void UncoreManager::msgProducer(int my_tid)
             // Check that we have place to store the message
             int msg_size = 0;
             MPI_Get_count(&status, MPI_CHAR, &msg_size);
-            int msg_count = msg_size / sizeof(MPIMsg);
+            unsigned msg_count = msg_size / sizeof(MPIMsg);
             if (cdata.empty_count() < msg_count)
                 continue;
 

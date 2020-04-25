@@ -81,7 +81,7 @@ class Network
        Coord getLoc(int node_id); 
        int getNodeId(Coord loc);
        Link* getLink(Coord node_id, Direction direction);
-       void report(ofstream& result_ofstream);
+       void report(std::ofstream& result_ofstream);
    private:
        int net_type;
        int num_nodes;

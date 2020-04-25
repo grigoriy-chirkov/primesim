@@ -118,7 +118,7 @@ class System
         int getHomeId(InsMem *ins_mem);
         int tlb_translate(InsMem *ins_mem, int core_id, int64_t timer);
         int getCoreCount();
-        void report(ofstream& result_ofstream);
+        void report(std::ofstream& result_ofstream);
         int get_parent_cache_id(int cache_id, int level);
         ~System();        
     private:

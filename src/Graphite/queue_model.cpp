@@ -46,7 +46,7 @@ void
 QueueModel::updateQueueUtilizationCounters(UInt64 request_time, UInt64 processing_time, UInt64 queue_delay)
 {
    _total_utilized_cycles += processing_time;
-   _last_request_time = max<UInt64>(_last_request_time, request_time + queue_delay + processing_time);
+   _last_request_time = std::max<UInt64>(_last_request_time, request_time + queue_delay + processing_time);
    _total_requests ++;
 }
 

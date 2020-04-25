@@ -5,9 +5,12 @@
 
 #include <cassert>
 #include <stdlib.h>
+#include <vector>
 
 #include "interval_tree.h"
 #include "utils.h"
+
+using namespace std;
 
 IntervalTree::Node::Node():
    parent(NULL),

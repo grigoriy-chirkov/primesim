@@ -7,7 +7,6 @@
 #include <string>
 #include <utility>
 #include <stdio.h>
-using namespace std;
 
 #include "fixed_types.h"
 
@@ -21,14 +20,14 @@ class IntervalTree
             Node(const Node& node_);
             ~Node();
 
-            void initialize(pair<UInt64,UInt64> interval_);
+            void initialize(std::pair<UInt64,UInt64> interval_);
 
             Node* parent;
             Node* left;
             Node* right;
             SInt32 height;
             UInt64 key;
-            pair<UInt64,UInt64> interval;
+            std::pair<UInt64,UInt64> interval;
       };
 
       IntervalTree(Node* root_tree);
@@ -36,7 +35,7 @@ class IntervalTree
 
       void insert(Node* node);
       Node* remove(Node* node);
-      Node* search(pair<UInt64,UInt64> interval);
+      Node* search(std::pair<UInt64,UInt64> interval);
       UInt32 size() { return _size; }
       void inOrderTraversal();
 
@@ -58,7 +57,7 @@ class IntervalTree
 
       void insertInTree(Node* node, Node* root_subtree);
       Node* removeFromTree(Node* node);
-      Node* searchTree(pair<UInt64,UInt64> interval, Node* root_subtree);
+      Node* searchTree(std::pair<UInt64,UInt64> interval, Node* root_subtree);
 
       void rebalanceAVLTree(Node* root_subtree);
       Node* balanceHeight(Node* root_subtree);
@@ -74,7 +73,7 @@ class IntervalTree
       void swap(Node* node1, Node* node2);
       Node* findMinKeyNode(Node* root_subtree);
 
-      void inOrderTraversalTree(Node* root_subtree, string prefix);
+      void inOrderTraversalTree(Node* root_subtree, std::string prefix);
 
       Node* _root_tree;
       UInt32 _size;

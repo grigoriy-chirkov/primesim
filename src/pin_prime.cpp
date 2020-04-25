@@ -28,6 +28,7 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
+#include "mpi.h"
 
 #include "portability.H"
 #include <stdio.h>
@@ -40,7 +41,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <dlfcn.h>
 #include "pin.H"
 #include "instlib.H"
-#include "mpi.h"
 #include "core_manager.h"
 
 using namespace std;
@@ -190,20 +190,20 @@ int32_t Usage()
 
 int main(int argc, char *argv[])
 {
-    // Link to the OpenMPI library
-    dlopen(OPENMPI_PATH, RTLD_NOW | RTLD_GLOBAL);
+    // Link to the MPI library
+    dlopen(MPI_PATH, RTLD_NOW | RTLD_GLOBAL);
 
-    int prov = 0, rc = 0;
     if (PIN_Init(argc, argv)) return Usage();
-
+    
+    int prov = 0, rc = 0;
     rc = MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &prov);
     if (rc != MPI_SUCCESS) {
         cerr << "Error starting MPI program. Terminating.\n";
         MPI_Abort(MPI_COMM_WORLD, rc);
     }
     if(prov != MPI_THREAD_MULTIPLE) {
-        cerr << "Provide level of thread supoort is not required: " << prov << endl;
-        MPI_Abort(MPI_COMM_WORLD, 1);
+        cerr << "Necessary level of thread support is not provided: " << prov << endl;
+        MPI_Abort(MPI_COMM_WORLD, -1);
     }
     
     PIN_InitSymbols();

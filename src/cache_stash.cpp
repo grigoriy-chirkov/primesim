@@ -31,7 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "cache_stash.h"
 #include <algorithm>
 
-CacheStash::CacheStash(int _size) 
+CacheStash::CacheStash(size_t _size) 
 {
     size = _size;
     pthread_mutex_init(&mutex, NULL);

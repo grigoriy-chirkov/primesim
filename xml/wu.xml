@@ -1,8 +1,8 @@
 <?xml version = "1.0" encoding = "utf-8" standalone = "yes"?>
 
 <simulator>
-    <num_prod_threads>4</num_prod_threads>
-    <num_cons_threads>28</num_cons_threads>
+    <num_prod_threads>1</num_prod_threads>
+    <num_cons_threads>1</num_cons_threads>
     <max_msg_size>1000</max_msg_size>
     <system>
        <dram_access_time>120</dram_access_time>

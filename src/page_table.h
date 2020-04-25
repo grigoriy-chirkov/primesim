@@ -45,8 +45,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <pthread.h> 
 
 
-typedef pair<int, uint64_t> UKey;
-typedef map<UKey, uint64_t> PageMap; 
+typedef std::pair<int, uint64_t> UKey;
+typedef std::map<UKey, uint64_t> PageMap; 
 
 
 class PageTable
@@ -56,7 +56,7 @@ class PageTable
         uint64_t getPageId(uint64_t addr);
         uint64_t translate(InsMem* ins_mem);
         int getTransDelay();
-        void report(ofstream& result);
+        void report(std::ofstream& result);
         IntSet prog_set;
         ~PageTable();        
     private:
