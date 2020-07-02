@@ -1,0 +1,26 @@
+#!/usr/bin/python
+
+import os
+from os import path
+import subprocess
+import time
+
+prime_path  = os.environ.get('PRIME_PATH') 
+cfg_dir = path.join(prime_path, "xml")
+out_dir = path.join(prime_path, "parsec_out")
+
+benchmarks=["parsec.swaptions"]
+
+for bench in benchmarks:
+	for b in [500, 200, 100, 50, 20, 10, 5, 2, 1]:
+		for pr in ["mesi", "wu"]:
+		    for c in [16]:
+		    #for c in [2, 4, 8]:
+		    	eff_cores = c  
+		        subprocess.call(["run_prime", 
+		            "-c", path.join(cfg_dir, "%s_c%d_b%d.xml" % (pr, eff_cores, b)), 
+		            "-o", path.join(out_dir, "%s_%s_c%d_b%d.out" % (bench, pr, c, b)),
+		            "-p", "-c4 -N1 -t23:00:00", 
+		            "-b", 
+		            bench])
+		        time.sleep(1)
