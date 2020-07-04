@@ -29,6 +29,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 #include <iostream>
+
+#ifndef NOMPI
 #include "mpi.h"
 
 void createCommWithoutUncore(MPI_Comm& comm, MPI_Comm* barrier_comm) {
@@ -39,19 +41,41 @@ void createCommWithoutUncore(MPI_Comm& comm, MPI_Comm* barrier_comm) {
     MPI_Group prime_group, barrier_group;
     rc = MPI_Comm_group(comm, &prime_group); 
     if (rc != MPI_SUCCESS) {
-        std::cerr << "Could not extract group. Terminating.\n";
+        std::cerr << "Could not extract group. Terminating." << std::endl;
         MPI_Abort(MPI_COMM_WORLD, rc);
     }
 
     rc = MPI_Group_excl(prime_group, 1, rank_excl, &barrier_group);
     if (rc != MPI_SUCCESS) {
-        std::cerr << "Could not create barrier group. Terminating.\n";
+        std::cerr << "Could not create barrier group. Terminating." << std::endl;
         MPI_Abort(MPI_COMM_WORLD, rc);
     }
 
     rc = MPI_Comm_create(comm, barrier_group, barrier_comm);
     if (rc != MPI_SUCCESS) {
-        std::cerr << "Could not create barrier comm. Terminating.\n";
+        std::cerr << "Could not create barrier comm. Terminating." << std::endl;
         MPI_Abort(MPI_COMM_WORLD, rc);
     }
 }
+
+int init_mpi(int* argc, char*** argv) {
+    int prov = 0, rc = 0;
+    rc = MPI_Init_thread(argc, argv, MPI_THREAD_MULTIPLE, &prov);
+    if (rc != MPI_SUCCESS) {
+        std::cerr << "Error starting MPI program. Terminating." << std::endl;
+        MPI_Abort(MPI_COMM_WORLD, rc);
+    }
+    if(prov != MPI_THREAD_MULTIPLE) {
+        std::cerr << "Necessary level of thread support is not provided: " << prov << std::endl;
+        MPI_Abort(MPI_COMM_WORLD, -1);
+    }
+    int rank = -1;
+    rc = MPI_Comm_rank(MPI_COMM_WORLD,&rank);
+    if (rc != MPI_SUCCESS) {
+        std::cerr << "Cannot determine rank" << std::endl;
+        MPI_Abort(MPI_COMM_WORLD, rc);
+    }
+    return rank;
+}
+
+#endif

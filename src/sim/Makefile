@@ -1,3 +1,4 @@
+
 ###########################################################################
 #Copyright (c) 2015 Princeton University
 #All rights reserved.
@@ -26,17 +27,38 @@
 ##############################################################################
 
 
-all: bin/prime.so bin/pin_wrapper bin/prime
+GRAPHITE_PATH = $(PRIME_PATH)/src/sim/Graphite
 
-bin/prime.so: src/pin/* src/*
-	cd src/pin && $(MAKE)
+MPICC := mpicc
+MPICXX := mpicxx
 
-bin/pin_wrapper: src/pin_wrapper/* src/*
-	cd src/pin_wrapper && $(MAKE)
+OUT := $(PRIME_PATH)/bin/prime
+CXX_FILES := $(notdir $(wildcard *.cpp ../*.cpp)) 
+CXX_FILES += $(wildcard Graphite/*.cpp)
+O_FILES := $(CXX_FILES:%.cpp=$(PRIME_PATH)/obj/sim/%.o)
 
-bin/prime: src/sim/* src/*
-	cd src/sim && $(MAKE)
+CXX_FLAGS := -std=c++17 -Wall -Werror -O2 -g $(shell xml2-config --cflags) -I$(GRAPHITE_PATH) -I..
+LD_FLAGS :=  -O2 -g $(shell xml2-config --libs)
+
+
+.PHONY: clean
+
+all: $(OUT)
+
+$(PRIME_PATH)/obj/sim/common.o: ../common.cpp 
+	$(MPICXX) -c $< -o $@ $(CXX_FLAGS)
+
+$(PRIME_PATH)/obj/sim/Graphite/%.o: Graphite/%.cpp  
+	$(MPICXX) -c $< -o $@ $(CXX_FLAGS)
+
+$(PRIME_PATH)/obj/sim/%.o: %.cpp 
+	$(MPICXX) -c $< -o $@ $(CXX_FLAGS)
+
+
+$(OUT): $(O_FILES)
+	$(MPICXX) $^ -o $@ $(LD_FLAGS)
+
+
 
 clean:
-	cd src/sim && $(MAKE) clean && cd ../pin_wrapper && $(MAKE) clean && cd ../pin && $(MAKE) clean
-
+	rm -f $(O_FILES) $(OUT)

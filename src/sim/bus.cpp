@@ -1,5 +1,7 @@
 //===========================================================================
-// thread_sched.cpp schedules threads to cores
+// bus.cpp implements a simple bus with fix delay. The 
+// contention delay is based on analytical M/G/1 queueing model
+// from the MIT Graphite simulator
 //===========================================================================
 /*
 Copyright (c) 2015 Princeton University
@@ -28,68 +30,51 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-
 #include <iostream>
-#include <fstream>
-#include <sstream>
+#include <cmath>
 #include <string>
 #include <cstring>
 #include <inttypes.h>
-#include <cmath>
-#include <assert.h>
 
-#include "thread_sched.h"
-#include "common.h"
+#include "bus.h"
 
+using namespace std;
 
-void ThreadSched::init(int num_cores_in)
+Bus::Bus(const XmlBus& xml_bus) :
+      unlim_bw(xml_bus.unlim_bw),
+      data_pkt_len(xml_bus.data_pkt_len),
+      ctrl_pkt_len(xml_bus.ctrl_pkt_len),    
+      bandwidth(xml_bus.bandwidth) 
 {
-    num_cores = num_cores_in;
-    core_stat = new int [num_cores];
-    assert(core_stat);
-    memset(core_stat, 0, sizeof(int) * num_cores);
-
-    core_map = new int*[num_cores];
-    assert(core_map);
-    memset(core_map, 0, sizeof(int*) * num_cores);
-
-    next_empty = 0;
-}
-
-
-//Allocate a core for a thread
-int ThreadSched::allocCore(int pid, int tid)
-{
-    int cur_core = next_empty;
-    next_empty++;
-
-    if (cur_core >= num_cores)
-        return -1;
-
-    core_stat[cur_core] = pid;
-    if (core_map[pid] == NULL) {
-        core_map[pid] = new int[num_cores];
-        assert(core_map[pid]);
-        memset(core_map[pid], -1, sizeof(int) * num_cores);
+    if (!unlim_bw) {
+      int min_delay = ctrl_pkt_len / bandwidth + (ctrl_pkt_len % bandwidth != 0);
+      bus_queue = QueueModel::create("history_tree", min_delay);
     }
-    core_map[pid][tid] = cur_core;
-    return cur_core;
 }
 
-//Return the core id for the allocated thread
-int ThreadSched::getCoreId(int pid, int tid)
+// This function returns bus contention_delay only because bus access time is 
+// included in cache access time
+
+uint64_t Bus::access(uint64_t timer, bool is_data)
 {
-    assert(core_map[pid] != NULL);
-    return core_map[pid][tid];
+    if (unlim_bw) {
+      return 0;
+    }
+
+    int pkt_len = is_data ? data_pkt_len : ctrl_pkt_len;
+    int delay = pkt_len / bandwidth + (pkt_len % bandwidth != 0);
+
+    local_mutex.lock();
+    uint64_t contention_delay = bus_queue->computeQueueDelay(timer, delay); 
+    local_mutex.unlock();
+
+    return contention_delay;
 }
 
-//Return the core id for the allocated thread
-int ThreadSched::getProcId(int cid)
-{
-    return core_stat[cid];
-}
 
-ThreadSched::~ThreadSched()
+Bus::~Bus()
 {
-    delete [] core_stat;
+    if (!unlim_bw) {
+        delete bus_queue;     
+    }
 }

@@ -68,29 +68,33 @@ enum MemType
 };
 
 
-struct CacheLevel
+struct alignas(64) CacheLevel
 {
-    int         level;
-    int         share;
-    int         num_caches;
-    int         access_time;
-    uint64_t    size;
-    uint64_t    num_ways;
-    uint64_t    block_size;
+    const int         level = 0;
+    const int         share = 0;
+    const int         num_caches = 0;
+    const int         access_time = 0;
+    const uint64_t    size = 0;
+    const uint64_t    num_ways = 0;
+    const uint64_t    block_size = 0;
     uint64_t    ins_count = 0;
     uint64_t    miss_count = 0;
     double      miss_rate = 0.0;
     double      lock_time = 0.0;
 
-    void init(int _level, int _share, int _num_caches, int _access_time, uint64_t _size, uint64_t _block_size, uint64_t _num_ways) {
-        level = _level;
-        share = _share;
-        num_caches = _num_caches;
-        access_time = _access_time;
-        size = _size;
-        block_size = _block_size;
-        num_ways = _num_ways;
-    }
+    CacheLevel(int _level, int _share, int _num_caches, 
+               int _access_time, uint64_t _size, 
+               uint64_t _block_size, uint64_t _num_ways) :
+        level(_level),
+        share(_share),
+        num_caches(_num_caches),
+        access_time(_access_time),
+        size(_size),
+        block_size(_block_size),
+        num_ways(_num_ways)
+    {};
+
+    CacheLevel() = delete;
 };
 
 
@@ -99,7 +103,7 @@ struct CacheLevel
 class System
 {
     public:
-        void init(const XmlSys* xml_sys);
+        System(const XmlSys& xml_sys);
         Cache* init_caches(int level, int cache_id);
         void init_directories(int home_id);
         int access(int core_id, InsMem* ins_mem, int64_t timer);
@@ -117,29 +121,35 @@ class System
         int allocHomeId(int num_homes, uint64_t addr);
         int getHomeId(InsMem *ins_mem);
         int tlb_translate(InsMem *ins_mem, int core_id, int64_t timer);
-        int getCoreCount();
+        inline int getCoreCount() {
+            return num_cores;
+        }
         void report(std::ofstream& result_ofstream);
-        int get_parent_cache_id(int cache_id, int level);
+        inline int get_parent_cache_id(int cache_id, int level) {
+            return cache_id*cache_level[level].share/cache_level[level+1].share;    
+        }
         ~System();        
     private:
-        int        sys_type;
-        int        protocol_type;
-        int        protocol;
-        int        max_num_sharers;
-        int        num_cores;
-        int        dram_access_time;
-        int        num_levels;
-        int        page_size;
-        int        tlb_enable;
-        int        shared_llc;
-        int        verbose_report;
+        System() = delete;
+        const int        sys_type;
+        const int        protocol_type;
+        const int        protocol;
+        const int        max_num_sharers;
+        const int        num_cores;
+        const int        dram_access_time;
+        const int        num_levels;
+        const int        page_size;
+        const int        tlb_enable;
+        const int        shared_llc;
+        const int        verbose_report;
+        const XmlSys&    xml_sys;
+
         bool       *hit_flag;
         int*       delay;
         int        total_num_broadcast;
         double     total_bus_contention;
         int*       home_stat;
-        const XmlSys*    xml_sys;
-        CacheLevel* cache_level;
+        std::vector<CacheLevel> cache_level;
         Cache***   cache;
         Cache**    directory_cache;
         Cache*     tlb_cache;

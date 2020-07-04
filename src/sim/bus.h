@@ -1,7 +1,5 @@
 //===========================================================================
-// link.cpp implements a link with fix propogation delay. The 
-// contention delay is based on analytical M/G/1 queueing model from 
-// the MIT Graphite Simulator
+// bus.h 
 //===========================================================================
 /*
 Copyright (c) 2015 Princeton University
@@ -30,37 +28,31 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include <iostream>
-#include <cmath>
+#ifndef BUS_H
+#define BUS_H
+
 #include <string>
-#include <cstring>
 #include <inttypes.h>
+#include <thread>
+#include <mutex>
+#include "queue_model.h"
+#include "xml_parser.h"
 
-#include "link.h"
-
-
-using namespace std;
-
-bool Link::init(uint64_t delay_in)
+class Bus
 {
-    pthread_mutex_init(&mutex, NULL);
-    delay = delay_in;
-    link_queue = QueueModel::create("history_tree", delay);
-    return true;
-}
+    public:
+        ~Bus();
+        Bus(const XmlBus& xml_bus);
+        uint64_t access(uint64_t timer, bool is_data);
+    private:
+        Bus() = delete;
+        const bool unlim_bw;
+        const uint64_t data_pkt_len;
+        const uint64_t ctrl_pkt_len;
+        const uint64_t bandwidth;
+        std::mutex local_mutex;
+        QueueModel *bus_queue;
+};
 
-// This function returns link delay including contention delay
 
-uint64_t Link::access(uint64_t timer, int packet_len)
-{
-    pthread_mutex_lock(&mutex);
-    uint64_t contention_delay = link_queue->computeQueueDelay(timer, packet_len);
-    pthread_mutex_unlock(&mutex);
-    return (contention_delay + delay);
-}
-
-Link::~Link()
-{
-    pthread_mutex_destroy(&mutex);
-    delete link_queue;
-}
+#endif // BUS_H

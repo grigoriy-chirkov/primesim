@@ -33,12 +33,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <string>
 #include <inttypes.h>
-#include <fstream>
-#include <sstream>
-#include <list>
-#include <pthread.h> 
+#include <ostream>
+#include <thread> 
+#include <condition_variable>
+#include <atomic>
 #include "system.h"
-#include "thread_sched.h"
 #include "xml_parser.h"
 #include "cache.h"
 #include "network.h"
@@ -46,37 +45,21 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "mpi.h"
 
-class UncoreManager;
-
-struct HandlerArgs {
-    UncoreManager* uncore_manager;
-    int tid;
-};
-
-struct HandlerData {
-    pthread_t handle;
-    HandlerArgs args;
-
-    void init(UncoreManager* uncore_manager, int tid) {
-        args.uncore_manager = uncore_manager;
-        args.tid = tid;
-    }
-} __attribute__((aligned(64)));
-
-struct CoreData {
+struct alignas(64) CoreData {
     MPIMsg* msgs = NULL;
     uint64_t in_pos = 0;
     uint64_t out_pos = 0;
     uint64_t count = 0;
     uint64_t max_count = 0;
-    pthread_mutex_t mutex; // needed to add/remove data from the buffer
-    pthread_cond_t can_produce; // signaled when items are removed
+    std::mutex local_mutex; // needed to add/remove data from the buffer
+    std::condition_variable can_produce; // signaled when items are removed
     
-    bool valid = false;
     int cid = -1;
     int pid = -1; 
     int tid = -1;
+    bool valid = false;
     bool finished = false;
+    bool locked = false;
 
     uint64_t cycle = 0;
     uint64_t segment = 0;
@@ -89,14 +72,17 @@ struct CoreData {
     ~CoreData();
     void insert_msg(const MPIMsg* inbuffer, size_t num);
     size_t eject_msg(MPIMsg* outbuffer, size_t num);
-    size_t empty_count();
     void report(std::ofstream& report_ofstream);
-} __attribute__ ((aligned (64)));
+
+    inline size_t empty_count() {
+        return max_count - count;
+    };
+}; 
 
 class UncoreManager
 {
 public:
-    void init(const XmlSim* xml_sim);
+    UncoreManager(const XmlSim &xml_sim);
     void report(const char* result_basename);
     void msgProducer(int );
     void msgConsumer(int );
@@ -104,46 +90,51 @@ public:
     void alloc_server();  
     void collect_threads();      
     ~UncoreManager();
+
+    const int num_cores;
 private:
-    System* sys = NULL;
-    ThreadSched* thread_sched = NULL;
-    HandlerData* producers = NULL;
-    HandlerData* consumers = NULL;
-    CoreData* core_data = NULL;
+    UncoreManager() = delete;
+    System sys;
+    std::vector<CoreData> core_data;
+    std::vector<std::thread> producers;
+    std::vector<std::thread> consumers;
 
-    double sim_start_time;
-    double sim_finish_time;
+    double sim_start_time = 0.0;
+    double sim_finish_time = 0.0;
 
-    pthread_mutex_t mutex;
+    std::mutex print_mutex;
+    std::mutex cnt_mutex;
     MPI_Comm   comm;
-    int proc_num = 0;
-    int num_threads_live = 0;
-    std::vector<int>* segment_cnt = NULL;
-    uint64_t cur_segment = 0;
 
-    int max_msg_size;
-    int num_cons_threads;
-    int num_prod_threads;
-    uint64_t thread_sync_interval;
-    uint64_t proc_sync_interval;
-    double cpi_nonmem;
-    double freq;
-    //ifstream* in;
+    std::vector<int> segment_cnt;
+    std::atomic<int> num_proc = 0;
+    std::atomic<int> num_threads_live = 0;
+    std::atomic<int> num_threads = 0;
+    std::atomic<int> next_empty_core = 0;
+    std::atomic<uint64_t> cur_segment = 0;
 
-    void lock();
-    void unlock();
-    void add_proc(int pid);
-    void rm_proc(int pid);
-    int allocCore(int pid, int tid);
-    int getCoreId(int pid, int tid);
-    int getProcId(int cid);
-    int getCoreCount();
-    uint64_t getCycle();
-    int uncore_access(int core_id, InsMem* ins_mem, int64_t timer);
-    double getAvgCycle();
+    const int max_msg_size;
+    const int num_cons_threads;
+    const int num_prod_threads;
+    const uint64_t thread_sync_interval;
+    const double cpi_nonmem;
+    const double freq;
+
+    uint64_t getCycle() const;
+    double getAvgCycle() const;
     void getSimStartTime();
     void getSimFinishTime();
-    void reserveSegmentCntSpace(uint64_t num);
+
+    inline void reserveSegmentCntSpace(uint64_t num) 
+    {
+        if (segment_cnt.size() <= num+1) {
+            segment_cnt.resize(2*num+1, 0);
+        }
+    }
+    inline int uncore_access(int core_id, InsMem* ins_mem, int64_t timer) {
+        return sys.access(core_id, ins_mem, timer);
+    }
+
 };
 
 

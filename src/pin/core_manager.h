@@ -32,14 +32,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define  CORE_MANAGER_H
 
 #include "portability.H"
-#include <string>
 #include <inttypes.h>
-#include <fstream>
-#include <sstream>
-#include <cstdio>
+#include <array>
 #include <iostream>
-#include <cmath>
-#include <string>
 #include <cassert>
 #include <syscall.h>
 #include <utmpx.h>
@@ -47,62 +42,52 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <sys/time.h>
 #include <time.h>
 #include <dlfcn.h>
-#include "mpi.h"
 #include "common.h"
 
 
-#define CORE_THREAD_MAX 1024
-
-struct ThreadData {
+struct alignas(64) ThreadData {
     uint32_t ins_nonmem = 0;
-    MPIMsg   *msgs = NULL;
+    std::vector<MPIMsg> msgs;
     int mpi_pos = 1;
     ThreadState thread_state = DEAD;
     bool valid = false;
     int cid = -1;
+    int fifo_fd = -1;
 
-    void init(int max_msg_size) {
+    void init(int max_msg_size, int _fifo_fd) {
+        msgs = std::vector<MPIMsg>(max_msg_size);
         valid = true;
         thread_state = ACTIVE;
-        msgs = new MPIMsg [max_msg_size + 1];
-        assert(msgs != NULL);
-        memset(msgs, 0, (max_msg_size + 1) * sizeof(MPIMsg));
+        fifo_fd = _fifo_fd;
     };
-
-    ~ThreadData() {
-        if (valid)
-            delete[] msgs;
-    };
-} __attribute__ ((aligned (64)));
+} ;
 
 class CoreManager
 {
     public:
-        void init(int max_msg_size, int server_tid);
+        CoreManager(int pid, int max_msg_size);
         void startSim();
         void finishSim(int32_t code, void *v);
         void execNonMem(uint32_t ins_count_in, THREADID threadid);
         void execMem(void * addr, THREADID threadid, uint32_t size, bool mem_type);
         void threadStart(THREADID threadid, CONTEXT *ctxt, int32_t flags, void *v);
         void threadFini(THREADID threadid, const CONTEXT *ctxt, int32_t code, void *v);
+        // void syscallEntry(THREADID threadid);
         void syscallEntry(THREADID threadIndex, CONTEXT *ctxt, SYSCALL_STANDARD std, void *v);
         void syscallExit(THREADID threadIndex, CONTEXT *ctxt, SYSCALL_STANDARD std, void *v);
-        void dumpTrace(MPIMsg* trace, size_t num);
-        ~CoreManager();        
     private:
+        CoreManager() = delete;
         void drainMemReqs(THREADID threadid);
-        void sysBefore(ADDRINT ip, ADDRINT num, ADDRINT arg0, ADDRINT arg1, ADDRINT arg2, 
-               ADDRINT arg3, ADDRINT arg4, ADDRINT arg5, THREADID threadid);
-        void sysAfter(ADDRINT ret, THREADID threadid);
-        void lock();
-        void unlock();
-        ThreadData* thread_data;
-        int syscall_count;
-        int max_msg_size;
-        int server_tid;
-        int pid;
-        MPI_Comm comm;
-        PIN_MUTEX mutex;
+        int createPipe(THREADID tid) const;
+        int createPipe() const;
+        bool isLock(ADDRINT num, ADDRINT arg1) const;
+        void sysBefore(ADDRINT num, ADDRINT arg1, THREADID threadid);
+        void sysAfter(THREADID threadid);
+
+        std::array<ThreadData, MAX_THREADS_PER_PROCESS> thread_data;
+        const int max_msg_size = -1;
+        const int pid = -1;
+        int fifo_fd = -1;
 };
 
 

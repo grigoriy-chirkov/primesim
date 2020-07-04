@@ -27,15 +27,7 @@
 
 module load rh/devtoolset/7
 module load intel/18.0
-
-#export MPI_VER=2.0.2
-#export MPI_COMPILER=intel170
-#module load openmpi/intel-17.0/${MPI_VER}
 module load intel-mpi/intel/2018.3
-
-# Path to MPI lib, set to correct
-#export MPI_LIB_PATH=\\\"/usr/local/openmpi/${MPI_VER}/${MPI_COMPILER}/x86_64/lib64/libmpi.so\\\"
-export MPI_LIB_PATH=\\\"/opt/intel/compilers_and_libraries_2018.3.222/linux/mpi/intel64/lib/libmpi.so\\\"
 
 # home directory for PriME, set it to the correct path
 export PRIME_PATH=`pwd`
@@ -45,5 +37,3 @@ export PINPATH=/tigress/gchirkov/pin-2.14-71313-gcc.4.4.7-linux
 
 # set path
 export PATH=$PRIME_PATH/tools:$PINPATH/intel64/bin:$PATH
-
-#export OMPI_MCA_btl=tcp,sm,self

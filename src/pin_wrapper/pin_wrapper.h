@@ -1,8 +1,8 @@
 //===========================================================================
-// link.h 
+// pin_wrapper.h 
 //===========================================================================
 /*
-Copyright (c) 2015 Princeton University
+Copyright (c) 2020 Princeton University
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -28,24 +28,16 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifndef LINK_H
-#define LINK_H
+#ifndef __PIN_WRAPPER_H
+#define __PIN_WRAPPER_H
 
-#include <string>
-#include <inttypes.h>
-#include "queue_model.h"
+#include <thread>
+#include "mpi.h"
+#include "common.h"
+#include <vector>
 
-class Link
-{
-    public:
-        ~Link();
-        bool init(uint64_t delay_in);
-        uint64_t access(uint64_t timer, int packet_len);
-    private:
-        uint64_t delay;
-        pthread_mutex_t mutex;
-        QueueModel *link_queue;
-};
+std::tuple<int, int, std::string> parse_args(int argc, char** argv);
+void usage();
+void run_pin(int max_msg_size, int pid, const std::string& cmd_line);
 
-
-#endif // LINK_H
+#endif

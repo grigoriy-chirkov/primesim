@@ -1,3 +1,4 @@
+
 ###########################################################################
 #Copyright (c) 2015 Princeton University
 #All rights reserved.
@@ -25,18 +26,33 @@
 #SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ##############################################################################
 
+MPICC := mpicc
+MPICXX := mpicxx
 
-all: bin/prime.so bin/pin_wrapper bin/prime
+OUT := $(PRIME_PATH)/bin/pin_wrapper
+CXX_FILES := $(notdir $(wildcard *.cpp ../*.cpp))
+O_FILES := $(CXX_FILES:%.cpp=$(PRIME_PATH)/obj/pin_wrapper/%.o)
 
-bin/prime.so: src/pin/* src/*
-	cd src/pin && $(MAKE)
+CXX_FLAGS := -std=c++17 -Wall -Werror -O2 -g -I.. \
+             -DPIN=\"$(shell which pinbin)\" \
+             -DPRIMELIB=\"$(PRIME_PATH)/bin/prime.so\"
+LD_FLAGS :=  -O2 -g 
 
-bin/pin_wrapper: src/pin_wrapper/* src/*
-	cd src/pin_wrapper && $(MAKE)
+.PHONY: clean
 
-bin/prime: src/sim/* src/*
-	cd src/sim && $(MAKE)
+all: $(OUT)
+
+$(PRIME_PATH)/obj/pin_wrapper/common.o: ../common.cpp 
+	$(MPICXX) -c $< -o $@ $(CXX_FLAGS)
+
+$(PRIME_PATH)/obj/pin_wrapper/%.o: %.cpp	
+	$(MPICXX) -c $< -o $@ $(CXX_FLAGS)
+
+$(OUT): $(O_FILES)
+	$(MPICXX) $^ -o $@ $(LD_FLAGS)
+
+
 
 clean:
-	cd src/sim && $(MAKE) clean && cd ../pin_wrapper && $(MAKE) clean && cd ../pin && $(MAKE) clean
+	rm -f $(PRIME_PATH)/obj/pin_wrapper/*.o $(OUT)
 

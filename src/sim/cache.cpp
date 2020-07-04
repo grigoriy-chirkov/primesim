@@ -47,17 +47,17 @@ using namespace std;
 
 
 
-void Cache::init(const XmlCache* xml_cache, Bus* bus_in, CacheType cache_type_in, int page_size_in, int level_in, int cache_id_in)
+void Cache::init(const XmlCache& xml_cache, Bus* bus_in, CacheType cache_type_in, int page_size_in, int level_in, int cache_id_in)
 {
     ins_count = 0;;
     miss_count = 0;
     evict_count = 0;
     wb_count = 0;
-    size = xml_cache->size;
-    num_ways = xml_cache->num_ways;
-    block_size = xml_cache->block_size;
+    size = xml_cache.size;
+    num_ways = xml_cache.num_ways;
+    block_size = xml_cache.block_size;
     num_sets = size / (block_size*num_ways);
-    access_time = xml_cache->access_time;
+    access_time = xml_cache.access_time;
     cache_type = cache_type_in;
     page_size = page_size_in;
     level = level_in;

@@ -31,11 +31,19 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifndef COMMON_H
 #define COMMON_H
 
+#include <inttypes.h>
+
+#ifndef NOMPI
 #include "mpi.h"
+#endif
+
+constexpr int MAX_THREADS_PER_PROCESS = 2048;
+
 
 enum MessageType
 {
-    MEM_REQUESTS = 0,
+    WRONG=0,
+    MEM_REQUESTS = 9,
     PROCESS_STARTING = 3,
     PROCESS_FINISHING = 1,
     NEW_THREAD = 4,
@@ -46,6 +54,8 @@ enum MessageType
     TERMINATE = 2
 };
 
+#pragma pack(push)  /* push current alignment to stack */
+#pragma pack(1)     /* set alignment to 1 byte boundary */
 struct MPIMsg
 {   
     bool is_control; 
@@ -54,15 +64,32 @@ struct MPIMsg
             MessageType  message_type;
             int          tid;
             int          pid;
-            int          payload_len;
-        } __attribute__((packed));
+        }; 
         struct { // mem msg
             bool        mem_type; //1 means write, 0 means read
             uint64_t    addr_dmem; 
             uint32_t    ins_before;
-        } __attribute__((packed));
-    } __attribute__((packed));
-} __attribute__((packed));
+        }; 
+    }; 
+    void populate_control(MessageType _message_type, int _tid, int _pid) {
+        is_control = true;
+        message_type = _message_type;
+        tid = _tid;
+        pid = _pid;
+    };
+    void populate_mem(bool _mem_type, uint64_t _addr_dmem, uint32_t _ins_before) {
+        is_control = false;
+        mem_type = _mem_type;
+        addr_dmem = _addr_dmem;
+        ins_before = _ins_before;
+    };
+
+    MPIMsg() {
+        populate_control(WRONG, 0, 0);
+        populate_mem(false, 0, 0);
+    };
+} ;
+#pragma pack(pop)   /* restore original alignment from stack */
 
 
 enum ThreadState
@@ -74,8 +101,11 @@ enum ThreadState
     WAIT    = 4
 };
 
+#ifndef NOMPI
+constexpr int server_tag = MPI_TAG_UB;
 void createCommWithoutUncore(MPI_Comm& comm, MPI_Comm* barrier_comm);
-
+int init_mpi(int* argc, char*** argv);
+#endif
 
 
 #endif  // COMMON_H

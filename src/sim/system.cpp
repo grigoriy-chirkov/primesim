@@ -43,19 +43,25 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 using namespace std;
 
-void System::init(const XmlSys* xml_sys_in)
+inline int getNumCoresOnLevel(int num_cores, const XmlSys& xml_sys, int level) {
+    return (int)ceil((double)num_cores / xml_sys.cache[level].share);
+} 
+
+System::System(const XmlSys& xml_sys_in) : 
+    xml_sys(xml_sys_in),
+    sys_type(xml_sys_in.sys_type),
+    protocol_type(xml_sys_in.protocol_type),
+    protocol(xml_sys_in.protocol),
+    num_cores(xml_sys_in.num_cores),
+    dram_access_time(xml_sys_in.dram_access_time),
+    page_size(xml_sys_in.page_size),
+    tlb_enable(xml_sys_in.tlb_enable),
+    shared_llc(xml_sys_in.shared_llc),
+    num_levels(xml_sys_in.num_levels),
+    verbose_report(xml_sys_in.verbose_report),
+    max_num_sharers(xml_sys_in.max_num_sharers),
+    network(getNumCoresOnLevel(num_cores, xml_sys_in, xml_sys_in.num_levels-1), xml_sys.network, xml_sys_in.verbose_report)
 {
-    xml_sys = xml_sys_in;
-    sys_type = xml_sys->sys_type;
-    protocol_type = xml_sys->protocol_type;
-    protocol = xml_sys->protocol;
-    num_cores = xml_sys->num_cores;
-    dram_access_time = xml_sys->dram_access_time;
-    page_size = xml_sys->page_size;
-    tlb_enable = xml_sys->tlb_enable;
-    shared_llc = xml_sys->shared_llc;
-    num_levels = xml_sys->num_levels;
-    verbose_report = xml_sys->verbose_report;
     total_bus_contention = 0;
     total_num_broadcast = 0;
 
@@ -69,16 +75,14 @@ void System::init(const XmlSys* xml_sys_in)
         hit_flag[i] = false;
         delay[i] = 0;
     }
-    cache_level = new CacheLevel [num_levels];
-    assert(cache_level != NULL);
     for (int i = 0; i < num_levels; i++) {
-        cache_level[i].init(xml_sys->cache[i].level, 
-                            xml_sys->cache[i].share, 
-                            (int)ceil((double)num_cores / xml_sys->cache[i].share), 
-                            xml_sys->cache[i].access_time, 
-                            xml_sys->cache[i].size, 
-                            xml_sys->cache[i].block_size,
-                            xml_sys->cache[i].num_ways);
+        cache_level.emplace_back(xml_sys.cache[i].level, 
+                                 xml_sys.cache[i].share, 
+                                 getNumCoresOnLevel(num_cores, xml_sys, i), 
+                                 xml_sys.cache[i].access_time, 
+                                 xml_sys.cache[i].size, 
+                                 xml_sys.cache[i].block_size,
+                                 xml_sys.cache[i].num_ways);
     }
     cache = new Cache** [num_levels];
     for (int i = 0; i < num_levels; i++) {
@@ -96,25 +100,24 @@ void System::init(const XmlSys* xml_sys_in)
     directory_cache_bus = NULL;
 
 
-    network.init(cache_level[num_levels-1].num_caches, xml_sys->network);
-    home_stat = new int [network.getNumNodes()];
+    home_stat = new int [network.num_nodes];
     assert(home_stat != NULL);
-    for (int i = 0; i < network.getNumNodes(); i++) {
+    for (int i = 0; i < network.num_nodes; i++) {
         home_stat[i] = 0;
     }
-    if (xml_sys->directory_cache->size > 0) {
-        directory_cache = new Cache* [network.getNumNodes()];
+    if (xml_sys.directory_cache.size > 0) {
+        directory_cache = new Cache* [network.num_nodes];
         assert(directory_cache != NULL);
-        for (int i = 0; i < network.getNumNodes(); i++) {
+        for (int i = 0; i < network.num_nodes; i++) {
             directory_cache[i] = NULL;
         }
     }
 
-    if (tlb_enable && xml_sys->tlb_cache->size > 0) {
+    if (tlb_enable && xml_sys.tlb_cache.size > 0) {
         tlb_cache = new Cache [num_cores];
         assert(tlb_cache != NULL);
         for (int i = 0; i < num_cores; i++) {
-            tlb_cache[i].init(xml_sys->tlb_cache, NULL, TLB_CACHE, page_size, 0, i);
+            tlb_cache[i].init(xml_sys.tlb_cache, NULL, TLB_CACHE, page_size, 0, i);
         }
     }
 
@@ -128,9 +131,9 @@ void System::init(const XmlSys* xml_sys_in)
         }
     }
 
-    directory_cache_lock = new pthread_mutex_t [network.getNumNodes()];
+    directory_cache_lock = new pthread_mutex_t [network.num_nodes];
     assert(directory_cache_lock != NULL);
-    for (int i = 0; i < network.getNumNodes(); i++) {
+    for (int i = 0; i < network.num_nodes; i++) {
         pthread_mutex_init(&directory_cache_lock[i], NULL);
     }
 
@@ -144,13 +147,13 @@ void System::init(const XmlSys* xml_sys_in)
         }
     }   
 
-    directory_cache_init_done = new bool [network.getNumNodes()];
+    directory_cache_init_done = new bool [network.num_nodes];
     assert(directory_cache_init_done != NULL);
-    for (int i = 0; i < network.getNumNodes(); i++) {
+    for (int i = 0; i < network.num_nodes; i++) {
         directory_cache_init_done[i] = false;
     }
 
-    page_table.init(page_size, xml_sys->page_miss_delay);
+    page_table.init(page_size, xml_sys.page_miss_delay);
     dram.init(dram_access_time);
 }
 
@@ -193,10 +196,9 @@ Cache* System::init_caches(int level, int cache_id)
         cache[level][cache_id] = new Cache();
         assert(cache[level][cache_id] != NULL);
         if (bus[level] == NULL) {
-            bus[level] = new Bus;
-            bus[level]->init(xml_sys->bus);
+            bus[level] = new Bus(xml_sys.bus);
         }
-        cache[level][cache_id]->init(&(xml_sys->cache[level]), bus[level], DATA_CACHE, page_size, level, cache_id);
+        cache[level][cache_id]->init(xml_sys.cache[level], bus[level], DATA_CACHE, page_size, level, cache_id);
         if (level == 0) {
             cache[level][cache_id]->num_children = 0;
             cache[level][cache_id]->child = NULL;
@@ -234,11 +236,10 @@ void System::init_directories(int home_id)
     if (directory_cache[home_id] == NULL) {
         directory_cache[home_id] = new Cache();
         if (directory_cache_bus == NULL) {
-            directory_cache_bus = new Bus;
+            directory_cache_bus = new Bus(xml_sys.bus);
             assert(directory_cache_bus != NULL);
-            directory_cache_bus->init(xml_sys->bus);    
         }
-        directory_cache[home_id]->init(xml_sys->directory_cache, directory_cache_bus, DIRECTORY_CACHE, page_size, 0, home_id);
+        directory_cache[home_id]->init(xml_sys.directory_cache, directory_cache_bus, DIRECTORY_CACHE, page_size, 0, home_id);
     }
     directory_cache_init_done[home_id] = true;
     pthread_mutex_unlock(&directory_cache_lock[home_id]);
@@ -386,11 +387,6 @@ State System::mesi_bus(Cache* cache_cur, int level, int cache_id, int core_id, I
         cache_cur->unlockUp(ins_mem);
         return line_cur->state; 
     }
-}
-
-int System::get_parent_cache_id(int cache_id, int level)
-{
-    return cache_id*cache_level[level].share/cache_level[level+1].share;    
 }
 
 // This function models an acess to a multi-level cache sytem with bus-based
@@ -817,7 +813,7 @@ int System::accessDirectoryCache(int cache_id, int home_id, InsMem* ins_mem, int
                     if (delay_temp > delay_max) {
                         delay_max = delay_temp;
                     }
-                    delay_pipe += network.getHeaderFlits();
+                    delay_pipe += network.header_flits;
                 }
                 delay += delay_max;
             }   
@@ -854,7 +850,7 @@ int System::accessDirectoryCache(int cache_id, int home_id, InsMem* ins_mem, int
                     if (delay_temp > delay_max) {
                         delay_max = delay_temp;
                     }
-                    delay_pipe += network.getHeaderFlits();
+                    delay_pipe += network.header_flits;
                 }
                 delay += delay_max;
                 delay += dram.access(ins_mem);
@@ -932,7 +928,7 @@ int System::accessSharedCache(int cache_id, int home_id, InsMem* ins_mem, int64_
                     if (delay_temp > delay_max) {
                         delay_max = delay_temp;
                     }
-                    delay_pipe += network.getHeaderFlits();
+                    delay_pipe += network.header_flits;
                 }
                 delay += delay_max;
             }
@@ -969,7 +965,7 @@ int System::accessSharedCache(int cache_id, int home_id, InsMem* ins_mem, int64_
                     if(delay_temp > delay_max) {
                         delay_max = delay_temp;
                     }
-                    delay_pipe += network.getHeaderFlits();
+                    delay_pipe += network.header_flits;
                 }
                 delay += delay_max;
             }
@@ -1036,7 +1032,7 @@ int System::tlb_translate(InsMem *ins_mem, int core_id, int64_t timer)
 int System::allocHomeId(int num_homes, uint64_t addr)
 {
     //Home bits
-    int offset = (int) log2(xml_sys->directory_cache->block_size );
+    int offset = (int) log2(xml_sys.directory_cache.block_size );
     int home_mask = (int)ceil(log2(num_homes));
     int home_bits = (int)(((addr >> offset)) % (1 << home_mask));
     if (home_bits < num_homes) {
@@ -1049,20 +1045,12 @@ int System::allocHomeId(int num_homes, uint64_t addr)
 
 int System::getHomeId(InsMem *ins_mem)
 {
-    int home_id = allocHomeId(network.getNumNodes(), ins_mem->addr_dmem);
+    int home_id = allocHomeId(network.num_nodes, ins_mem->addr_dmem);
     if (home_id < 0) {
         cerr<<"Error: Wrong home id\n";
     }
     return home_id;
 }
-
-
-
-int System::getCoreCount()
-{
-    return num_cores;
-}
-
 
 void System::report(ofstream& result_ofstream)
 {
@@ -1073,30 +1061,6 @@ void System::report(ofstream& result_ofstream)
     dram.report(result_ofstream); 
     result_ofstream << endl <<  "Simulation result for cache system: \n\n";
     
-    if (verbose_report) {
-        result_ofstream << "Home Occupation:\n";
-        if (network.getNetType() == MESH_3D) {
-            result_ofstream << "Allocated home locations in 3D coordinates:" << endl;
-            for (int i = 0; i < network.getNumNodes(); i++) {
-                if (home_stat[i]) {
-                    Coord loc = network.getLoc(i); 
-                    result_ofstream << "("<<loc.x<<", "<<loc.y<<", "<<loc.z<<")\n";
-                }
-            }
-        }
-        else {
-            result_ofstream << "Allocated home locations in 2D coordinates:" << endl;
-            for (int i = 0; i < network.getNumNodes(); i++) {
-                if (home_stat[i]) {
-                    Coord loc = network.getLoc(i); 
-                    result_ofstream << "("<<loc.x<<", "<<loc.y<<")\n";
-                }
-             }
-        }
-        result_ofstream << endl;
-    }
-    result_ofstream << endl;
-
     if (tlb_enable) {
         ins_count =0;   
         miss_count = 0;
@@ -1110,7 +1074,7 @@ void System::report(ofstream& result_ofstream)
         miss_rate = (double)miss_count / (double)ins_count; 
            
         result_ofstream << "TLB Cache"<<"===========================================================\n";
-        result_ofstream << "Simulation results for "<< xml_sys->tlb_cache->size << " Bytes " << xml_sys->tlb_cache->num_ways
+        result_ofstream << "Simulation results for "<< xml_sys.tlb_cache.size << " Bytes " << xml_sys.tlb_cache.num_ways
                    << "-way set associative cache model:\n";
         result_ofstream << "The total # of TLB access instructions: " << ins_count << endl;
         result_ofstream << "The # of cache-missed instructions: " << miss_count << endl;
@@ -1118,9 +1082,7 @@ void System::report(ofstream& result_ofstream)
         result_ofstream << "The cache miss rate: " << 100 * miss_rate << "%" << endl;
         result_ofstream << "=================================================================\n\n";
         
-        if (verbose_report) {
-           // page_table.report(result_ofstream);
-        }
+        page_table.report(result_ofstream);
     } 
 
     result_ofstream << endl;
@@ -1159,7 +1121,7 @@ void System::report(ofstream& result_ofstream)
     evict_count = 0;
     wb_count = 0;
     miss_rate = 0;
-    for (int i = 0; i < network.getNumNodes(); i++) {
+    for (int i = 0; i < network.num_nodes; i++) {
         if (directory_cache[i] != NULL) {
             ins_count += directory_cache[i]->getInsCount();
             miss_count += directory_cache[i]->getMissCount();
@@ -1170,7 +1132,7 @@ void System::report(ofstream& result_ofstream)
     miss_rate = (double)miss_count / (double)ins_count; 
        
     result_ofstream << "Directory Cache"<<"===========================================================\n";
-    result_ofstream << "Simulation results for "<< xml_sys->directory_cache->size << " Bytes " << xml_sys->directory_cache->num_ways
+    result_ofstream << "Simulation results for "<< xml_sys.directory_cache.size << " Bytes " << xml_sys.directory_cache.num_ways
                << "-way set associative cache model:\n";
     result_ofstream << "The total # of memory instructions: " << ins_count << endl;
     result_ofstream << "The # of cache-missed instructions: " << miss_count << endl;
@@ -1197,7 +1159,7 @@ void System::report(ofstream& result_ofstream)
         if (directory_cache != NULL) {
             result_ofstream << "****************************************************" <<endl;
             result_ofstream << "Statistics for each directory caches with non-zero accesses" <<endl;
-            for (int i = 0; i < network.getNumNodes(); i++) {
+            for (int i = 0; i < network.num_nodes; i++) {
                 if (directory_cache[i] != NULL) {
                     if (directory_cache[i]->getInsCount() > 0) {
                         result_ofstream << "Report for directory cache "<<i<<endl;
@@ -1248,7 +1210,7 @@ System::~System()
             delete [] cache_lock[i];
             delete [] cache_init_done[i];
         }
-        for (int i = 0; i < network.getNumNodes(); i++) {
+        for (int i = 0; i < network.num_nodes; i++) {
             if (directory_cache[i] != NULL) {
                 delete directory_cache[i];
             }
@@ -1257,7 +1219,6 @@ System::~System()
         delete [] delay;
         delete [] home_stat;
         delete [] cache;
-        delete [] cache_level;
         delete [] directory_cache;
         delete [] tlb_cache;
         delete [] cache_lock;

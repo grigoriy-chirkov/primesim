@@ -95,7 +95,7 @@ struct InsMem
 {
     char        mem_type = -1; // -1 means invalid, 2 means writeback, 1 means write, 0 means read
     int         pid = -1;
-    int         tid = -1;
+    //int         tid = -1;
     uint64_t    addr_dmem = 0; 
 };
 
@@ -108,7 +108,7 @@ class Cache
         Cache**     child;
         Bus*        bus;
         
-        void init(const XmlCache* xml_cache, Bus* bus_in, CacheType cache_type_in, int page_size_in, int level_in, int cache_id_in);
+        void init(const XmlCache& xml_cache, Bus* bus_in, CacheType cache_type_in, int page_size_in, int level_in, int cache_id_in);
         Line* accessLine(InsMem* ins_mem);
         Line* directAccess(int set, int way, InsMem* ins_mem);
         Line* replaceLine(InsMem* ins_mem_old, InsMem* ins_mem);

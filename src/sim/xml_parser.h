@@ -42,71 +42,75 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 struct XmlCache
 {
-    int         level;
-    int         share;
-    int         access_time;
-    uint64_t    size;
-    uint64_t    block_size;
-    uint64_t    num_ways;
+    int         level = 0;
+    int         share = 0;
+    int         access_time = 0;
+    uint64_t    size = 0;
+    uint64_t    block_size = 0;
+    uint64_t    num_ways = 0;
 };
 
 struct XmlNetwork
 {
-    int data_width;
-    int header_flits;
-    int net_type;
-    uint64_t router_delay;
-    uint64_t link_delay;
-    uint64_t inject_delay;
+    int data_width = 0;
+    int header_flits = 0;
+    int net_type = 0;
+    uint64_t router_delay = 0;
+    uint64_t link_delay = 0;
+    uint64_t inject_delay = 0;
 };
 
 struct XmlBus
 {
-    int bandwidth;
-    bool unlim_bw;
-    int ctrl_pkt_len;
-    int data_pkt_len;
+    int bandwidth = 0;
+    bool unlim_bw = false;
+    int ctrl_pkt_len = 0;
+    int data_pkt_len = 0;
 };
 
 struct XmlSys
 {
-    int         sys_type;
-    int         protocol_type;
-    int         protocol;
-    int         max_num_sharers;
-    int         page_size;
-    int         tlb_enable;
-    int         shared_llc;
-    int         verbose_report;
-    double      cpi_nonmem;
-    int         dram_access_time;
-    int         num_levels;
-    int         num_cores;
-    double      freq;
-    int         page_miss_delay;
-    XmlNetwork* network;
-    XmlBus*     bus;
-    XmlCache*   directory_cache;
-    XmlCache*   tlb_cache;
-    XmlCache*   cache;
+    int         sys_type = 0;
+    int         protocol_type = 0;
+    int         protocol = 0;
+    int         max_num_sharers = 0;
+    int         page_size = 0;
+    int         tlb_enable = 0;
+    int         shared_llc = 0;
+    int         verbose_report = 0;
+    double      cpi_nonmem = 0;
+    int         dram_access_time = 0;
+    int         num_levels = 0;
+    int         num_cores = 0;
+    double      freq = 0;
+    int         page_miss_delay = 0;
+    XmlNetwork  network;
+    XmlBus      bus;
+    XmlCache    directory_cache;
+    XmlCache    tlb_cache;
+    XmlCache*   cache = NULL;
 };
 
 struct XmlSim
 {
-    int        max_msg_size;
-    int        num_cons_threads;
-    int        num_prod_threads;
-    int        thread_sync_interval;
-    int        syscall_cost;
-    XmlSys*    sys; 
+    int        max_msg_size = 0;
+    int        num_cons_threads = 0;
+    int        num_prod_threads = 0;
+    int        thread_sync_interval = 0;
+    int        syscall_cost = 0;
+    XmlSys     sys; 
 };
 
 
 class XmlParser 
 {
     public:
-        XmlParser();
-        XmlSim*   getXmlSim();
+        XmlParser(const char *docname);
+        const XmlSim&   getXmlSim() const;
+        ~XmlParser();
+        bool isOk() { return ok; };
+    private:
+        XmlParser() = delete;
         bool getDoc(const char *docname);
         xmlXPathObjectPtr getNodeSet(xmlChar *xpath);
         bool parseCache(); 
@@ -116,11 +120,9 @@ class XmlParser
         bool parseTlbCache(); 
         bool parseSys(); 
         bool parseSim(); 
-        bool parse(const char *docname);
-        ~XmlParser();
-    private:
-        XmlSim*   xml_sim;
+        XmlSim    xml_sim;
         xmlDocPtr doc;
+        bool ok = false;
 };
 
 #endif  // XML_PARSER_H

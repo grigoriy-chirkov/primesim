@@ -40,71 +40,47 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 using namespace std;
 
-XmlParser::XmlParser()
+XmlParser::XmlParser(const char *docname)
 {
-    xml_sim = new XmlSim;
-    assert(xml_sim != NULL);
-    xml_sim->max_msg_size = 0;
-    xml_sim->num_cons_threads = 1;
-    xml_sim->num_prod_threads = 1;
-    xml_sim->thread_sync_interval = 0;
-    xml_sim->syscall_cost = 0;
-
-    xml_sim->sys = new XmlSys;
-    assert(xml_sim->sys != NULL);
-    xml_sim->sys->sys_type = 0;
-    xml_sim->sys->protocol_type = 0;
-    xml_sim->sys->max_num_sharers = 0;
-    xml_sim->sys->page_size = 0;
-    xml_sim->sys->tlb_enable = 0;
-    xml_sim->sys->shared_llc = 0;
-    xml_sim->sys->verbose_report = 0;
-    xml_sim->sys->cpi_nonmem = 0;
-    xml_sim->sys->dram_access_time = 0;
-    xml_sim->sys->num_levels = 0;
-    xml_sim->sys->freq = 0;
-    xml_sim->sys->num_cores = 0;
-    xml_sim->sys->page_miss_delay = 0;
-
-    xml_sim->sys->directory_cache = new XmlCache;
-    assert(xml_sim->sys->directory_cache != NULL);
-    xml_sim->sys->directory_cache->level = 0;
-    xml_sim->sys->directory_cache->share = 0;
-    xml_sim->sys->directory_cache->access_time = 0;
-    xml_sim->sys->directory_cache->size = 0;
-    xml_sim->sys->directory_cache->block_size = 0;
-    xml_sim->sys->directory_cache->num_ways = 0;
-
-    xml_sim->sys->tlb_cache = new XmlCache;
-    assert(xml_sim->sys->tlb_cache != NULL);
-    xml_sim->sys->tlb_cache->level = 0;
-    xml_sim->sys->tlb_cache->share = 0;
-    xml_sim->sys->tlb_cache->access_time = 0;
-    xml_sim->sys->tlb_cache->size = 0;
-    xml_sim->sys->tlb_cache->block_size = 0;
-    xml_sim->sys->tlb_cache->num_ways = 0;
-
-
-    xml_sim->sys->network = new XmlNetwork;
-    assert(xml_sim->sys->network != NULL);
-    xml_sim->sys->network->net_type = 0;
-    xml_sim->sys->network->data_width = 0;
-    xml_sim->sys->network->header_flits = 0;
-    xml_sim->sys->network->inject_delay = 0;
-    xml_sim->sys->network->router_delay = 0;
-    xml_sim->sys->network->link_delay = 0;
-
-
-    xml_sim->sys->bus = new XmlBus;
-    assert(xml_sim->sys->bus != NULL);
-    xml_sim->sys->bus->bandwidth = 0;
-    xml_sim->sys->bus->unlim_bw = false;
-    xml_sim->sys->bus->data_pkt_len = 0;
-    xml_sim->sys->bus->ctrl_pkt_len = 0;
+    ok = true;
+    if(getDoc(docname)){
+        if (!parseSim()) {
+            cerr << "Error in parsing simulator structure!\n";
+            ok = false;
+        }
+        else if (!parseSys()) {
+            cerr << "Error in parsing system structure!\n";
+            ok = false;
+        }
+        else if (!parseNetwork()) {
+            cerr << "Error in parsing network structure!\n";
+            ok = false;
+        }
+        else if (!parseBus()) {
+            cerr << "Error in parsing bus structure!\n";
+            ok = false;
+        }
+        else if (!parseDirectoryCache()) {
+            cerr << "Error in parsing directory cache structure!\n";
+            ok = false;
+        }
+        else if (!parseTlbCache()) {
+            cerr << "Error in parsing TLB cache structure!\n";
+            ok = false;
+        }
+        else if (!parseCache()) {
+            cerr << "Error in parsing cache structure!\n";
+            ok = false;
+        }
+    }
+    else {
+        cout << "Error in get xml document!\n";
+        ok = false;
+    }
 }
 
 
-XmlSim* XmlParser::getXmlSim()
+const XmlSim& XmlParser::getXmlSim() const
 {
     return xml_sim;
 }
@@ -171,7 +147,7 @@ bool XmlParser::parseSim()
                 convert.clear();
                 convert.str("");
                 convert << key;
-                convert >> dec >> xml_sim->max_msg_size;
+                convert >> dec >> xml_sim.max_msg_size;
                 xmlFree(key);
                 item_count++;
             }
@@ -180,7 +156,7 @@ bool XmlParser::parseSim()
                 convert.clear();
                 convert.str("");
                 convert << key;
-                convert >> dec >> xml_sim->num_cons_threads;
+                convert >> dec >> xml_sim.num_cons_threads;
                 xmlFree(key);
                 item_count++;
             }
@@ -189,7 +165,7 @@ bool XmlParser::parseSim()
                 convert.clear();
                 convert.str("");
                 convert << key;
-                convert >> dec >> xml_sim->num_prod_threads;
+                convert >> dec >> xml_sim.num_prod_threads;
                 xmlFree(key);
                 item_count++;
             }
@@ -198,7 +174,7 @@ bool XmlParser::parseSim()
                 convert.clear();
                 convert.str("");
                 convert << key;
-                convert >> dec >> xml_sim->thread_sync_interval;
+                convert >> dec >> xml_sim.thread_sync_interval;
                 xmlFree(key);
                 item_count++;
             }
@@ -207,7 +183,7 @@ bool XmlParser::parseSim()
                 convert.clear();
                 convert.str("");
                 convert << key;
-                convert >> dec >> xml_sim->syscall_cost;
+                convert >> dec >> xml_sim.syscall_cost;
                 xmlFree(key);
                 item_count++;
             }
@@ -243,7 +219,7 @@ bool XmlParser::parseSys()
                 convert.clear();
                 convert.str("");
                 convert << key;
-                convert >> dec >> xml_sim->sys->sys_type;
+                convert >> dec >> xml_sim.sys.sys_type;
                 xmlFree(key);
                 item_count++;
             }
@@ -252,7 +228,7 @@ bool XmlParser::parseSys()
                 convert.clear();
                 convert.str("");
                 convert << key;
-                convert >> dec >> xml_sim->sys->protocol_type;
+                convert >> dec >> xml_sim.sys.protocol_type;
                 xmlFree(key);
                 item_count++;
             }
@@ -261,7 +237,7 @@ bool XmlParser::parseSys()
                 convert.clear();
                 convert.str("");
                 convert << key;
-                convert >> dec >> xml_sim->sys->protocol;
+                convert >> dec >> xml_sim.sys.protocol;
                 xmlFree(key);
                 item_count++;
             }
@@ -270,7 +246,7 @@ bool XmlParser::parseSys()
                 convert.clear();
                 convert.str("");
                 convert << key;
-                convert >> dec >> xml_sim->sys->max_num_sharers;
+                convert >> dec >> xml_sim.sys.max_num_sharers;
                 xmlFree(key);
                 //optional item is not checked
                 //item_count++;
@@ -280,7 +256,7 @@ bool XmlParser::parseSys()
                 convert.clear();
                 convert.str("");
                 convert << key;
-                convert >> dec >> xml_sim->sys->page_size;
+                convert >> dec >> xml_sim.sys.page_size;
                 xmlFree(key);
                 item_count++;
             }
@@ -289,7 +265,7 @@ bool XmlParser::parseSys()
                 convert.clear();
                 convert.str("");
                 convert << key;
-                convert >> dec >> xml_sim->sys->tlb_enable;
+                convert >> dec >> xml_sim.sys.tlb_enable;
                 xmlFree(key);
                 item_count++;
             }
@@ -298,7 +274,7 @@ bool XmlParser::parseSys()
                 convert.clear();
                 convert.str("");
                 convert << key;
-                convert >> dec >> xml_sim->sys->shared_llc;
+                convert >> dec >> xml_sim.sys.shared_llc;
                 xmlFree(key);
                 item_count++;
             }
@@ -307,7 +283,7 @@ bool XmlParser::parseSys()
                 convert.clear();
                 convert.str("");
                 convert << key;
-                convert >> dec >> xml_sim->sys->verbose_report;
+                convert >> dec >> xml_sim.sys.verbose_report;
                 xmlFree(key);
                 item_count++;
             }
@@ -316,7 +292,7 @@ bool XmlParser::parseSys()
                 convert.clear();
                 convert.str("");
                 convert << key;
-                convert >> xml_sim->sys->cpi_nonmem;
+                convert >> xml_sim.sys.cpi_nonmem;
                 xmlFree(key);
                 item_count++;
             }
@@ -325,7 +301,7 @@ bool XmlParser::parseSys()
                 convert.clear();
                 convert.str("");
                 convert << key;
-                convert >> dec >> xml_sim->sys->dram_access_time;
+                convert >> dec >> xml_sim.sys.dram_access_time;
                 xmlFree(key);
                 item_count++;
             }
@@ -334,7 +310,7 @@ bool XmlParser::parseSys()
                 convert.clear();
                 convert.str("");
                 convert << key;
-                convert >> dec >> xml_sim->sys->num_levels;
+                convert >> dec >> xml_sim.sys.num_levels;
                 xmlFree(key);
                 item_count++;
             }
@@ -343,7 +319,7 @@ bool XmlParser::parseSys()
                 convert.clear();
                 convert.str("");
                 convert << key;
-                convert >> dec >> xml_sim->sys->num_cores;
+                convert >> dec >> xml_sim.sys.num_cores;
                 xmlFree(key);
                 item_count++;
             }
@@ -352,7 +328,7 @@ bool XmlParser::parseSys()
                 convert.clear();
                 convert.str("");
                 convert << key;
-                convert >> dec >> xml_sim->sys->page_miss_delay;
+                convert >> dec >> xml_sim.sys.page_miss_delay;
                 xmlFree(key);
                 item_count++;
             }
@@ -362,14 +338,14 @@ bool XmlParser::parseSys()
                 convert.clear();
                 convert.str("");
                 convert << key;
-                convert >> xml_sim->sys->freq;
+                convert >> xml_sim.sys.freq;
                 xmlFree(key);
                 item_count++;
             }
         cur = cur->next;
         }
     }
-    xml_sim->sys->cache = new XmlCache [xml_sim->sys->num_levels]; 
+    xml_sim.sys.cache = new XmlCache [xml_sim.sys.num_levels]; 
     xmlXPathFreeObject(sys_node);
     return (item_count == 13);
 }
@@ -398,7 +374,7 @@ bool XmlParser::parseNetwork()
                 convert.clear();
                 convert.str("");
                 convert << key;
-                convert >> dec >> xml_sim->sys->network->net_type;
+                convert >> dec >> xml_sim.sys.network.net_type;
                 xmlFree(key);
                 //item_count++;
             }
@@ -407,7 +383,7 @@ bool XmlParser::parseNetwork()
                 convert.clear();
                 convert.str("");
                 convert << key;
-                convert >> dec >> xml_sim->sys->network->data_width;
+                convert >> dec >> xml_sim.sys.network.data_width;
                 xmlFree(key);
                 item_count++;
             }
@@ -416,7 +392,7 @@ bool XmlParser::parseNetwork()
                 convert.clear();
                 convert.str("");
                 convert << key;
-                convert >> dec >> xml_sim->sys->network->header_flits;
+                convert >> dec >> xml_sim.sys.network.header_flits;
                 xmlFree(key);
                 item_count++;
             }
@@ -425,7 +401,7 @@ bool XmlParser::parseNetwork()
                 convert.clear();
                 convert.str("");
                 convert << key;
-                convert >> dec >> xml_sim->sys->network->router_delay;
+                convert >> dec >> xml_sim.sys.network.router_delay;
                 xmlFree(key);
                 item_count++;
             }
@@ -434,7 +410,7 @@ bool XmlParser::parseNetwork()
                 convert.clear();
                 convert.str("");
                 convert << key;
-                convert >> dec >> xml_sim->sys->network->link_delay;
+                convert >> dec >> xml_sim.sys.network.link_delay;
                 xmlFree(key);
                 item_count++;
             }
@@ -443,7 +419,7 @@ bool XmlParser::parseNetwork()
                 convert.clear();
                 convert.str("");
                 convert << key;
-                convert >> dec >> xml_sim->sys->network->inject_delay;
+                convert >> dec >> xml_sim.sys.network.inject_delay;
                 xmlFree(key);
                 //item_count++;
             }
@@ -479,7 +455,7 @@ bool XmlParser::parseBus()
                 convert.clear();
                 convert.str("");
                 convert << key;
-                convert >> dec >> xml_sim->sys->bus->bandwidth;
+                convert >> dec >> xml_sim.sys.bus.bandwidth;
                 xmlFree(key);
                 item_count++;
             }
@@ -488,7 +464,7 @@ bool XmlParser::parseBus()
                 convert.clear();
                 convert.str("");
                 convert << key;
-                convert >> dec >> xml_sim->sys->bus->data_pkt_len;
+                convert >> dec >> xml_sim.sys.bus.data_pkt_len;
                 xmlFree(key);
                 item_count++;
             }
@@ -497,7 +473,7 @@ bool XmlParser::parseBus()
                 convert.clear();
                 convert.str("");
                 convert << key;
-                convert >> dec >> xml_sim->sys->bus->ctrl_pkt_len;
+                convert >> dec >> xml_sim.sys.bus.ctrl_pkt_len;
                 xmlFree(key);
                 item_count++;
             }
@@ -506,7 +482,7 @@ bool XmlParser::parseBus()
                 convert.clear();
                 convert.str("");
                 convert << key;
-                convert >> dec >> xml_sim->sys->bus->unlim_bw;
+                convert >> dec >> xml_sim.sys.bus.unlim_bw;
                 xmlFree(key);
                 //item_count++;
             }
@@ -543,7 +519,7 @@ bool XmlParser::parseDirectoryCache()
                 convert.clear();
                 convert.str("");
                 convert << key;
-                convert >> dec >> xml_sim->sys->directory_cache->level;
+                convert >> dec >> xml_sim.sys.directory_cache.level;
                 xmlFree(key);
                 item_count++;
             }
@@ -552,7 +528,7 @@ bool XmlParser::parseDirectoryCache()
                 convert.clear();
                 convert.str("");
                 convert << key;
-                convert >> dec >> xml_sim->sys->directory_cache->share;
+                convert >> dec >> xml_sim.sys.directory_cache.share;
                 xmlFree(key);
                 item_count++;
             }
@@ -561,7 +537,7 @@ bool XmlParser::parseDirectoryCache()
                 convert.clear();
                 convert.str("");
                 convert << key;
-                convert >> dec >> xml_sim->sys->directory_cache->access_time;
+                convert >> dec >> xml_sim.sys.directory_cache.access_time;
                 xmlFree(key);
                 item_count++;
             }
@@ -570,7 +546,7 @@ bool XmlParser::parseDirectoryCache()
                 convert.clear();
                 convert.str("");
                 convert << key;
-                convert >> dec >> xml_sim->sys->directory_cache->size;
+                convert >> dec >> xml_sim.sys.directory_cache.size;
                 xmlFree(key);
                 item_count++;
             }
@@ -579,7 +555,7 @@ bool XmlParser::parseDirectoryCache()
                 convert.clear();
                 convert.str("");
                 convert << key;
-                convert >> dec >> xml_sim->sys->directory_cache->block_size;
+                convert >> dec >> xml_sim.sys.directory_cache.block_size;
                 xmlFree(key);
                 item_count++;
             }
@@ -588,7 +564,7 @@ bool XmlParser::parseDirectoryCache()
                 convert.clear();
                 convert.str("");
                 convert << key;
-                convert >> dec >> xml_sim->sys->directory_cache->num_ways;
+                convert >> dec >> xml_sim.sys.directory_cache.num_ways;
                 xmlFree(key);
                 item_count++;
             }
@@ -623,7 +599,7 @@ bool XmlParser::parseTlbCache()
                 convert.clear();
                 convert.str("");
                 convert << key;
-                convert >> dec >> xml_sim->sys->tlb_cache->level;
+                convert >> dec >> xml_sim.sys.tlb_cache.level;
                 xmlFree(key);
                 item_count++;
             }
@@ -632,7 +608,7 @@ bool XmlParser::parseTlbCache()
                 convert.clear();
                 convert.str("");
                 convert << key;
-                convert >> dec >> xml_sim->sys->tlb_cache->share;
+                convert >> dec >> xml_sim.sys.tlb_cache.share;
                 xmlFree(key);
                 item_count++;
             }
@@ -641,7 +617,7 @@ bool XmlParser::parseTlbCache()
                 convert.clear();
                 convert.str("");
                 convert << key;
-                convert >> dec >> xml_sim->sys->tlb_cache->access_time;
+                convert >> dec >> xml_sim.sys.tlb_cache.access_time;
                 xmlFree(key);
                 item_count++;
             }
@@ -650,7 +626,7 @@ bool XmlParser::parseTlbCache()
                 convert.clear();
                 convert.str("");
                 convert << key;
-                convert >> dec >> xml_sim->sys->tlb_cache->size;
+                convert >> dec >> xml_sim.sys.tlb_cache.size;
                 xmlFree(key);
                 item_count++;
             }
@@ -659,7 +635,7 @@ bool XmlParser::parseTlbCache()
                 convert.clear();
                 convert.str("");
                 convert << key;
-                convert >> dec >> xml_sim->sys->tlb_cache->block_size;
+                convert >> dec >> xml_sim.sys.tlb_cache.block_size;
                 xmlFree(key);
                 item_count++;
             }
@@ -668,7 +644,7 @@ bool XmlParser::parseTlbCache()
                 convert.clear();
                 convert.str("");
                 convert << key;
-                convert >> dec >> xml_sim->sys->tlb_cache->num_ways;
+                convert >> dec >> xml_sim.sys.tlb_cache.num_ways;
                 xmlFree(key);
                 item_count++;
             }
@@ -687,7 +663,7 @@ bool XmlParser::parseCache()
     xmlXPathObjectPtr cache_node;
     cache_node = getNodeSet((xmlChar*) "//cache");
      
-    if (cache_node->nodesetval->nodeNr != xml_sim->sys->num_levels) {
+    if (cache_node->nodesetval->nodeNr != xml_sim.sys.num_levels) {
         xmlXPathFreeObject(cache_node);
         return false;
     }
@@ -704,7 +680,7 @@ bool XmlParser::parseCache()
                 convert.clear();
                 convert.str("");
                 convert << key;
-                convert >> dec >> xml_sim->sys->cache[i].level;
+                convert >> dec >> xml_sim.sys.cache[i].level;
                 xmlFree(key);
                 item_count++;
             }
@@ -713,7 +689,7 @@ bool XmlParser::parseCache()
                 convert.clear();
                 convert.str("");
                 convert << key;
-                convert >> dec >> xml_sim->sys->cache[i].share;
+                convert >> dec >> xml_sim.sys.cache[i].share;
                 xmlFree(key);
                 item_count++;
             }
@@ -722,7 +698,7 @@ bool XmlParser::parseCache()
                 convert.clear();
                 convert.str("");
                 convert << key;
-                convert >> dec >> xml_sim->sys->cache[i].access_time;
+                convert >> dec >> xml_sim.sys.cache[i].access_time;
                 xmlFree(key);
                 item_count++;
             }
@@ -731,7 +707,7 @@ bool XmlParser::parseCache()
                 convert.clear();
                 convert.str("");
                 convert << key;
-                convert >> dec >> xml_sim->sys->cache[i].size;
+                convert >> dec >> xml_sim.sys.cache[i].size;
                 xmlFree(key);
                 item_count++;
             }
@@ -740,7 +716,7 @@ bool XmlParser::parseCache()
                 convert.clear();
                 convert.str("");
                 convert << key;
-                convert >> dec >> xml_sim->sys->cache[i].block_size;
+                convert >> dec >> xml_sim.sys.cache[i].block_size;
                 xmlFree(key);
                 item_count++;
             }
@@ -749,7 +725,7 @@ bool XmlParser::parseCache()
                 convert.clear();
                 convert.str("");
                 convert << key;
-                convert >> dec >> xml_sim->sys->cache[i].num_ways;
+                convert >> dec >> xml_sim.sys.cache[i].num_ways;
                 xmlFree(key);
                 item_count++;
             }
@@ -757,59 +733,12 @@ bool XmlParser::parseCache()
         }
     }
     xmlXPathFreeObject(cache_node);
-    return (item_count == 6 * xml_sim->sys->num_levels);
+    return (item_count == 6 * xml_sim.sys.num_levels);
 }
 
-//Parse the entire xml file and store the result
-bool XmlParser::parse(const char *docname)
-{
-    if(getDoc(docname)){
-        if (!parseSim()) {
-            cerr << "Error in parsing simulator structure!\n";
-            return false;
-        }
-        else if (!parseSys()) {
-            cerr << "Error in parsing system structure!\n";
-            return false;
-        }
-        else if (!parseNetwork()) {
-            cerr << "Error in parsing network structure!\n";
-            return false;
-        }
-        else if (!parseBus()) {
-            cerr << "Error in parsing bus structure!\n";
-            return false;
-        }
-        else if (!parseDirectoryCache()) {
-            cerr << "Error in parsing directory cache structure!\n";
-            return false;
-        }
-        else if (!parseTlbCache()) {
-            cerr << "Error in parsing TLB cache structure!\n";
-            return false;
-        }
-        else if (!parseCache()) {
-            cerr << "Error in parsing cache structure!\n";
-            return false;
-        }
-        else
-            return true;
-    }
-    else {
-        cout << "Error in get xml document!\n";
-        return false;
-    }
-}
 
 XmlParser::~XmlParser()
 {
-    delete [] xml_sim->sys->cache;
-    delete xml_sim->sys->bus;
-    delete xml_sim->sys->network;
-    delete xml_sim->sys->tlb_cache;
-    delete xml_sim->sys->directory_cache;
-    delete xml_sim->sys;
-    delete xml_sim;
     xmlFreeDoc(doc);
     xmlCleanupParser();
 }

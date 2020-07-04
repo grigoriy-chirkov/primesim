@@ -1,7 +1,7 @@
 //===========================================================================
-// bus.cpp implements a simple bus with fix delay. The 
-// contention delay is based on analytical M/G/1 queueing model
-// from the MIT Graphite simulator
+// link.cpp implements a link with fix propogation delay. The 
+// contention delay is based on analytical M/G/1 queueing model from 
+// the MIT Graphite Simulator
 //===========================================================================
 /*
 Copyright (c) 2015 Princeton University
@@ -36,57 +36,28 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <cstring>
 #include <inttypes.h>
 
-#include "bus.h"
+#include "link.h"
 
 
 using namespace std;
 
-bool Bus::init(const XmlBus* xml_bus)
+Link::Link(uint64_t delay_in) : 
+    delay(delay_in)
 {
-    if (xml_bus == NULL) {
-      unlim_bw = false;
-      data_pkt_len = 0;
-      ctrl_pkt_len = 0;
-      bandwidth = 0;
-    } else {
-      unlim_bw = xml_bus->unlim_bw;
-      data_pkt_len = xml_bus->data_pkt_len;
-      ctrl_pkt_len = xml_bus->ctrl_pkt_len;    
-      bandwidth = xml_bus->bandwidth;  
-    }
-    
-    if (!unlim_bw) {
-      int min_delay = ctrl_pkt_len / bandwidth + (ctrl_pkt_len % bandwidth != 0);
-      bus_queue = QueueModel::create("history_tree", min_delay);
-      pthread_mutex_init(&mutex, NULL);
-    }
-
-    return true;
+    link_queue = QueueModel::create("history_tree", delay);
 }
 
-// This function returns bus contention_delay only because bus access time is 
-// included in cache access time
+// This function returns link delay including contention delay
 
-uint64_t Bus::access(uint64_t timer, bool is_data)
+uint64_t Link::access(uint64_t timer, int packet_len)
 {
-    if (unlim_bw) {
-      return 0;
-    }
-
-    int pkt_len = is_data ? data_pkt_len : ctrl_pkt_len;
-    int delay = pkt_len / bandwidth + (pkt_len % bandwidth != 0);
-
-    pthread_mutex_lock(&mutex);
-    uint64_t contention_delay = bus_queue->computeQueueDelay(timer, delay); 
-    pthread_mutex_unlock(&mutex);
-    return contention_delay;
+    local_mutex.lock();
+    uint64_t contention_delay = link_queue->computeQueueDelay(timer, packet_len);
+    local_mutex.unlock();
+    return (contention_delay + delay);
 }
 
-
-Bus::~Bus()
+Link::~Link()
 {
-    if (!unlim_bw) {
-        pthread_mutex_destroy(&mutex);
-        delete bus_queue;     
-    }
+    delete link_queue;
 }

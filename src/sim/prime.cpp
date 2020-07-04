@@ -1,5 +1,5 @@
 //===========================================================================
-// bus.h 
+// prime.cpp contains the  MPI interfaces to processes of core models
 //===========================================================================
 /*
 Copyright (c) 2015 Princeton University
@@ -28,28 +28,54 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifndef BUS_H
-#define BUS_H
-
+#include <stdio.h>
+#include <assert.h>
+#include <iostream>
+#include <fstream>
+#include <sstream>
+#include <cmath>
 #include <string>
-#include <inttypes.h>
-#include "queue_model.h"
+#include <utility>
+#include <unistd.h>
+#include <map>
+#include <set>
+#include <vector>
+#include <pthread.h> 
+
+#include "mpi.h"
+#include "uncore_manager.h"
 #include "xml_parser.h"
+#include "common.h"
+#include "prime.h"
 
-class Bus
+using namespace std;
+
+int main(int argc, char *argv[])
 {
-    public:
-        ~Bus();
-        bool init(const XmlBus* xml_bus);
-        uint64_t access(uint64_t timer, bool is_data);
-    private:
-        bool unlim_bw;
-        uint64_t data_pkt_len;
-        uint64_t ctrl_pkt_len;
-        uint64_t bandwidth;
-        pthread_mutex_t mutex;
-        QueueModel *bus_queue;
-};
+    int rank = init_mpi(&argc, &argv);
+    assert(rank == 0);
 
+    if(argc != 3) {
+        cerr<<"usage: "<< argv[0] <<" config_file output_file\n";
+        MPI_Abort(MPI_COMM_WORLD, -1);
+        return -1;
+    }
 
-#endif // BUS_H
+    auto xml_parser = make_unique<XmlParser>(argv[1]);
+    if( !xml_parser->isOk() ) {
+        cerr<< "XML file parse error!\n";
+        MPI_Abort(MPI_COMM_WORLD, -1);
+        return -1;
+    }
+    const XmlSim& xml_sim = xml_parser->getXmlSim();
+
+    {
+        auto uncore_manager = make_unique<UncoreManager>(xml_sim);
+        uncore_manager->spawn_threads();
+        uncore_manager->alloc_server();
+        uncore_manager->collect_threads();
+        uncore_manager->report(argv[2]);
+    }
+
+    MPI_Finalize();    
+}

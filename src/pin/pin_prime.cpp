@@ -28,8 +28,6 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-#include "mpi.h"
-
 #include "portability.H"
 #include <stdio.h>
 #include <iostream>
@@ -45,14 +43,13 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 using namespace std;
 
-CoreManager *core_manager;
+CoreManager *core_manager = NULL;
 
 KNOB<int> KnobMaxMsgSize(KNOB_MODE_WRITEONCE, "pintool",
-    "l", "1000", "specify max_msg_size");
+    "l", "1024", "specify max_msg_size");
 
-KNOB<int> KnobNumRecvThreads(KNOB_MODE_WRITEONCE, "pintool",
-    "r", "1", "specify number of receiving threads in prime");
-
+KNOB<int> KnobPID(KNOB_MODE_WRITEONCE, "pintool",
+    "p", "1", "specify pid of current process");
 
 // Handle non-memory instructions
 // void PIN_FAST_ANALYSIS_CALL execNonMem(uint32_t ins_count, THREADID threadid)
@@ -66,6 +63,11 @@ void execMem(void * addr, THREADID threadid, uint32_t size, bool mem_type)
 {
     core_manager->execMem(addr, threadid, size, mem_type);
 }
+
+// void syscallEntry(THREADID threadid)
+// {
+//     core_manager->syscallEntry(threadid);
+// } 
 
 // This routine is executed every time a thread starts.
 void ThreadStart(THREADID threadid, CONTEXT *ctxt, int32_t flags, void *v)
@@ -145,6 +147,12 @@ void Trace(TRACE trace, void *v)
                 //     IARG_END
                 // );
             }
+
+            // if (INS_IsSyscall(ins)) {
+            //     INS_InsertPredicatedCall(
+            //         ins, IPOINT_BEFORE, (AFUNPTR)syscallEntry,
+            //         IARG_THREAD_ID, IARG_END);
+            // }
         }
         // Insert a call to execNonMem before every bbl, passing the number of nonmem instructions
         BBL_InsertCall(bbl, IPOINT_BEFORE, (AFUNPTR)execNonMem, IARG_FAST_ANALYSIS_CALL, 
@@ -159,16 +167,15 @@ void Trace(TRACE trace, void *v)
 
 void Start(void *v)
 {
-    core_manager = new CoreManager;
-    core_manager->init(KnobMaxMsgSize.Value(), KnobNumRecvThreads.Value());
+    core_manager = new CoreManager(KnobPID.Value(), KnobMaxMsgSize.Value());
     core_manager->startSim();
+
 }
 
 void Fini(int32_t code, void *v)
 {
     core_manager->finishSim(code, v);
     delete core_manager;
-    MPI_Finalize();
 }
 
 
@@ -180,7 +187,6 @@ int32_t Usage()
 {
     PIN_ERROR( "This Pintool simulates a many-core cache system\n" 
               + KNOB_BASE::StringKnobSummary() + "\n");
-    MPI_Abort(MPI_COMM_WORLD, -1);
     return -1;
 }
 
@@ -190,22 +196,7 @@ int32_t Usage()
 
 int main(int argc, char *argv[])
 {
-    // Link to the MPI library
-    dlopen(MPI_PATH, RTLD_NOW | RTLD_GLOBAL);
-
     if (PIN_Init(argc, argv)) return Usage();
-    
-    int prov = 0, rc = 0;
-    rc = MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &prov);
-    if (rc != MPI_SUCCESS) {
-        cerr << "Error starting MPI program. Terminating.\n";
-        MPI_Abort(MPI_COMM_WORLD, rc);
-    }
-    if(prov != MPI_THREAD_MULTIPLE) {
-        cerr << "Necessary level of thread support is not provided: " << prov << endl;
-        MPI_Abort(MPI_COMM_WORLD, -1);
-    }
-    
     PIN_InitSymbols();
     TRACE_AddInstrumentFunction(Trace, 0);
     PIN_AddSyscallEntryFunction(SyscallEntry, 0);

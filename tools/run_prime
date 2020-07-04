@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 
 # This script is a wrapper to run PriME with OpenMPI
 
@@ -36,113 +36,100 @@ from optparse import OptionParser
 import time
 import xml.etree.ElementTree as ET
 from datetime import datetime
+from os import path
 
+prime_path  = os.environ.get('PRIME_PATH') 
+prime_exe = path.join(prime_path, 'bin/prime')
+prime_so = path.join(prime_path, 'bin/prime.so')
+pinwrapper_exe = path.join(prime_path, 'bin/pin_wrapper')
 
-def get_max_msg_size(config_file):
+def get_max_msg_size(config_file : str):
     tree = ET.parse(config_file)
     root = tree.getroot()
     return root.find("max_msg_size").text
 
-def get_num_recv_threads(config_file):
-    tree = ET.parse(config_file)
-    root = tree.getroot()
-    return root.find("system").find("num_cores").text
 
-def run_prime_slurm(config_path, output_path, progs, dry, time, cores, mem):
-    config_path = os.path.abspath(config_path)
-    output_path = os.path.abspath(output_path)
-    prime_exe = prime_path+'/bin/prime'
-    prime_so = prime_path + '/bin/prime.so'
+def run_prime_slurm(config_path : str, output_path : str, progs : list, dry : bool, background : bool, params : str):
+    config_path = path.abspath(config_path)
+    output_path = path.abspath(output_path)
     max_msg_size = get_max_msg_size(config_path)
-    num_recv_threads = get_num_recv_threads(config_path)
-    prime_cmd_with_args = "%s %s %s" % (prime_exe , config_path , output_path)
-    task_filename = datetime.now().strftime("prime_%d_%m_%Y-%H%M%S.conf")
-    task_filename = os.path.join("cmd", task_filename)
-    
-    f = open(task_filename, "w")
-    f.write("0 %s\n" % prime_cmd_with_args)
-    for rank, prog in enumerate(progs, start=1):
-      pin_cmd_with_args = "pinbin -ifeellucky -t %s -l %s -r %s -- %s\n" % (prime_so, max_msg_size, num_recv_threads, prog)
-      f.write("%d %s" % (rank, pin_cmd_with_args))
-    f.close()
-    
-    print("srun -n%d -c%d -t%s --multi-prog %s" % (len(progs)+1, cores, time, task_filename))
-    if not dry:
-      os.execvp("srun", ["srun", "-n%d" % (len(progs) + 1), "-c%d" % cores, "-t%s" % time, "--mem-per-cpu=%s" % mem, "--multi-prog", task_filename])
+    task_id = datetime.now().strftime("prime_%d_%m_%Y-%H%M%S")
 
+    task_filename = path.join(prime_path, "cmd", task_id)
+    with open(task_filename, "w") as f:
+      prime_cmd_with_args = "%s %s %s" % (prime_exe , config_path , output_path)
+      f.write("0 %s\n" % prime_cmd_with_args)
+      for rank, prog in enumerate(progs, start=1):
+        pinwrapper_cmd_with_args = "%s -p %d -l %s -c %s\n" % (pinwrapper_exe, rank, max_msg_size, prog)
+        f.write("%d %s" % (rank, pinwrapper_cmd_with_args))
 
-def run_prime_locally(config_path, output_path, progs, dry):
-    config_path = os.path.abspath(config_path)
-    output_path = os.path.abspath(output_path)
-    prime_exe = prime_path+'/bin/prime'
-    prime_so = prime_path + '/bin/prime.so'
-    max_msg_size = get_max_msg_size(config_path)
-    num_recv_threads = get_num_recv_threads(config_path)
+    if background:
+      batch_filename = path.join(prime_path, "batch", task_id)
+      with open(batch_filename, "w") as f:
+        f.write("#!/bin/bash\n")
+        f.write("srun --multi-prog %s\n" % task_filename)
+      cmd = ["sbatch", "-n%d" % (len(progs)+1), "-o%s" % (output_path+'.log')] + params.split(' ') + [batch_filename]
 
-    cmd = ['mpirun', '-genv', 'I_MPI_PMI_LIBRARY', "\" \"", '-n', '1',
-            prime_exe , config_path , output_path]
-
-    # cmd = ['mpirun', '-n', '1',
-    #        prime_exe , config_path , output_path]
-
-    #cmd = ['mpirun', '--bind-to', 'none', '-n', '1',
-    #       prime_exe , config_path , output_path]
-
-
-    for prog in progs:
-        cmd += [':',  '-n',  '1', 'pinbin', '-ifeellucky', 
-                '-t', prime_so, 
-                '-l', max_msg_size, 
-                '-r', num_recv_threads,
-                '--', prog]
+    else:
+      cmd = ["srun"] + params.split(' ') + ["--multi-prog", task_filename]
     
     for word in cmd:
-      print(word),
-    
+      print(word, end=" ")
+    print('')
     if not dry:
       os.execvp(cmd[0], cmd)
 
-prime_path  = os.environ.get('PRIME_PATH') 
+
+def run_prime_locally(config_path : str, output_path : str, progs : list, dry : bool):
+    config_path = path.abspath(config_path)
+    output_path = path.abspath(output_path)
+    max_msg_size = get_max_msg_size(config_path)
+
+    cmd = ['mpirun', '-n', '1', prime_exe , config_path , output_path]
+    for rank, prog in enumerate(progs, start=1):
+        cmd += [':',  '-n', '1', pinwrapper_exe, 
+                '-p', str(rank),
+                '-l', max_msg_size, 
+                '-c', prog]
+    
+    for word in cmd:
+      print(word, end=" "),
+    print('')
+    if not dry:
+      os.execvp(cmd[0], cmd)
+
 
 def main():
-    usage = '''
-    run_prime [options] prog1 prog2 ...
-    '''
-   
-    parser = OptionParser(usage=usage)
+    parser = OptionParser(usage = "usage: run_prime [options] prog1 [prog2,prog3,...]")
     parser.add_option("-c", "--config_path",
                       dest="config_path", default=prime_path + "/xml/config.xml",
-                      metavar="CONFIG_PATH", help="use CONFIG_PATH to configure the simulated system, the default configuration path is xml/config.xml")
+                      metavar="CONFIG_PATH", help="use CONFIG_PATH to configure the simulated system (default: xml/config.xml)")
     
     parser.add_option("-o", "--output_path",
                       dest="output_path", default=prime_path + "/output/config.out",
-                      metavar="OUTPUT_PATH", help="write the report to OUTPUT_PATH, the default output path is output/config.out") 
+                      metavar="OUTPUT_PATH", help="write the report to OUTPUT_PATH (default: output/config.out)") 
 
     parser.add_option("-d", "--dry",
                        dest="dry", default=False, action="store_true",
                        metavar="DRY", help="print execution command")   
 
-
     parser.add_option("-l", "--local",
                        dest="local", default=False, action="store_true",
                        metavar="LOCAL", help="execute on local machine")   
 
-    parser.add_option("-t", "--time",
-                       dest="time", default="02:00:00",
-                       metavar="TIME", help="execution time for slurm")   
+    parser.add_option("-p", "--params",
+                       dest="params", default="",
+                       metavar="PARAMS", help="params to pass to slurm")   
 
-    parser.add_option("-n", "--cores",
-                       dest="cores", type=int, default=16,
-                       metavar="CORES", help="number of cores per process in slurm") 
+    parser.add_option("-b", "--background",
+                       dest="background", default=False, action="store_true",
+                       metavar="BACKGROUND", help="run task in background")   
 
-    parser.add_option("-m", "--mem",
-                       dest="mem", type=str, default="4G",
-                       metavar="MEM", help="number of mem per core in slurm")   
     (options, args) = parser.parse_args()
     if len(args) < 1:
-        parser.error("Incorrect number of arguments")
+        parser.error("You need to specify at least one program to run")
     if not options.local:
-      run_prime_slurm(options.config_path, options.output_path, args, options.dry, options.time, options.cores, options.mem)
+      run_prime_slurm(options.config_path, options.output_path, args, options.dry, options.background, options.params)
     else:
       run_prime_locally(options.config_path, options.output_path, args, options.dry)
 

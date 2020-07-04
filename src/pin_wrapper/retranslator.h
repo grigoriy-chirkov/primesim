@@ -1,8 +1,8 @@
 //===========================================================================
-// thread_sched.h 
+// retranslator.h
 //===========================================================================
 /*
-Copyright (c) 2015 Princeton University
+Copyright (c) 2020 Princeton University
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -28,33 +28,29 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifndef  THREAD_SCHED_H
-#define  THREAD_SCHED_H
+#ifndef RETRANSLATOR_H
+#define RETRANSLATOR_H
 
-#include <string>
-#include <inttypes.h>
-#include <fstream>
-#include <sstream>
-#include <map>
-#include <pthread.h>
+#include "common.h"
+#include <thread>
 
-class ThreadSched
-{
-    public:
-        void init(int num_cores_in);
-        int allocCore(int pid, int tid);
-        int getCoreId(int pid, int tid);
-        int getProcId(int cid);
-        ~ThreadSched();        
-    private:
-        int**  core_map;
-        int* core_stat;
 
-        int num_cores;
-        int next_empty;
+struct Retranslator {
+    MPI_Comm comm;
+    std::array<std::thread, MAX_THREADS_PER_PROCESS> threads;
+    const int max_msg_size = 1024;
+    const int pid = 1;
+
+    Retranslator(int pid, int max_msg_size);
+    Retranslator() = delete;
+    ~Retranslator();
+    void main_server();
+    void thread_translator(int tid);
+    int open_pipe();
+    int open_pipe(int tid);
+    void retransmit(MPIMsg* buf, int dst, int count);
+    int getCid(int tid);
+    void collect_threads();
 };
 
-
-
-
-#endif // THREAD_SCHED_H 
+#endif

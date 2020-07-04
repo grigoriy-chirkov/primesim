@@ -1,5 +1,5 @@
 //===========================================================================
-// network.h 
+// link.h 
 //===========================================================================
 /*
 Copyright (c) 2015 Princeton University
@@ -28,80 +28,26 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifndef NETWORK_H
-#define NETWORK_H
+#ifndef LINK_H
+#define LINK_H
 
 #include <string>
 #include <inttypes.h>
-#include <map>
-#include <set>
-#include <vector>
-#include <pthread.h> 
-#include "link.h"
-#include "cache.h"
+#include <mutex>
+#include "queue_model.h"
 
-class Link;
-
-
-
-enum Direction 
-{
-    EAST = 0,
-    WEST = 1,
-    NORTH = 2,
-    SOUTH = 3,
-    UP = 4,
-    DOWN = 5
-};
-
-enum NetworkType
-{
-    MESH_2D = 0,
-    MESH_3D = 1
-};
-
-typedef struct Coord
-{
-    int x;
-    int y;
-    int z;
-} Coord;
-
-
-class Network
+class Link
 {
     public:
-       ~Network();
-       bool init(int num_nodes_in, const XmlNetwork* xml_net);
-       uint64_t transmit(int sender, int receiver, int data_len, uint64_t timer);
-       int getNumNodes();
-       int getNetType();
-       int getNetWidth();
-       int getHeaderFlits();
-       Coord getLoc(int node_id); 
-       int getNodeId(Coord loc);
-       Link* getLink(Coord node_id, Direction direction);
-       void report(std::ofstream& result_ofstream);
-   private:
-       int net_type;
-       int num_nodes;
-       int net_width;
-       int data_width;
-       int header_flits;
-       uint64_t router_delay;
-       uint64_t link_delay;
-       uint64_t inject_delay;
-       Link*** link;
-       uint64_t num_access;
-       uint64_t total_delay;
-       uint64_t total_router_delay;
-       uint64_t total_link_delay;
-       uint64_t total_inject_delay;
-       uint64_t total_distance;
-       double avg_delay;
-       pthread_mutex_t mutex;
-        
+        ~Link();
+        Link(uint64_t delay_in);
+        uint64_t access(uint64_t timer, int packet_len);
+    private:
+        Link() = delete;
+        const uint64_t delay;
+        std::mutex local_mutex;
+        QueueModel *link_queue;
 };
 
 
-#endif //NETWORK_H
+#endif // LINK_H

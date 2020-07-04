@@ -1,5 +1,5 @@
 //===========================================================================
-// prime.cpp contains the  MPI interfaces to processes of core models
+// network.h 
 //===========================================================================
 /*
 Copyright (c) 2015 Princeton University
@@ -28,67 +28,75 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include <stdio.h>
-#include <assert.h>
-#include <iostream>
-#include <fstream>
-#include <sstream>
-#include <cmath>
+#ifndef NETWORK_H
+#define NETWORK_H
+
 #include <string>
-#include <utility>
-#include <unistd.h>
+#include <inttypes.h>
 #include <map>
 #include <set>
 #include <vector>
-#include <pthread.h> 
+#include <thread> 
+#include <mutex>
+#include "link.h"
+#include "cache.h"
 
-#include "mpi.h"
-#include "uncore_manager.h"
-#include "xml_parser.h"
-#include "common.h"
-#include "prime.h"
-
-using namespace std;
-
-int main(int argc, char *argv[])
+enum Direction 
 {
-    int rc, prov = 0;
-    rc = MPI_Init_thread(&argc,&argv, MPI_THREAD_MULTIPLE, &prov);
+    EAST = 0,
+    WEST = 1,
+    NORTH = 2,
+    SOUTH = 3,
+    UP = 4,
+    DOWN = 5
+};
 
-    if (rc != MPI_SUCCESS) {
-        cerr << "Error starting MPI program. Terminating." << endl;
-        MPI_Abort(MPI_COMM_WORLD, rc);
-    }
-    if(prov != MPI_THREAD_MULTIPLE) {
-        cerr << "Provide level of thread support is not required: " << prov << endl;
-        MPI_Abort(MPI_COMM_WORLD, rc);
-    }
+enum NetworkType
+{
+    MESH_2D = 0,
+    MESH_3D = 1
+};
 
-    if(argc != 3) {
-        cerr<<"usage: "<< argv[0] <<" config_file output_file\n";
-        MPI_Abort(MPI_COMM_WORLD, -1);
-        return -1;
-    }
+struct Coord
+{
+    int x = 0;
+    int y = 0;
+    Coord(int _x, int _y) : x(_x), y(_y) {};
+    Coord() = default;
+};
 
-    XmlParser* xml_parser = new XmlParser;
-    assert(xml_parser != NULL);
-    if( !xml_parser->parse(argv[1]) ) {
-        cerr<< "XML file parse error!\n";
-        MPI_Abort(MPI_COMM_WORLD, -1);
-        return -1;
-    }
-    const XmlSim* xml_sim = xml_parser->getXmlSim();
 
-    UncoreManager* uncore_manager = new UncoreManager;
-    assert(uncore_manager != NULL);
-    uncore_manager->init(xml_sim);
-    uncore_manager->spawn_threads();
-    uncore_manager->alloc_server();
-    uncore_manager->collect_threads();
-    uncore_manager->report(argv[2]);
-    delete uncore_manager;
+class Network
+{
+public:
+    ~Network();
+    Network(int num_nodes_in, const XmlNetwork& xml_net, bool verbose_report);
+    uint64_t transmit(int sender, int receiver, int data_len, uint64_t timer);
+    Coord getLoc(int node_id); 
+    int getNodeId(Coord loc);
+    Link* getLink(Coord node_id, Direction direction);
+    void report(std::ofstream& result_ofstream);
 
-    delete xml_parser;
+    const int num_nodes;
+    const int net_width;
+    const int header_flits;
+private:
+    Network();
+    Link*** link;
+    const bool verbose_report;
+    const int data_width;
+    const uint64_t router_delay;
+    const uint64_t link_delay;
+    const uint64_t inject_delay;
+    uint64_t num_access = 0;
+    uint64_t total_delay = 0;
+    uint64_t total_router_delay = 0;
+    uint64_t total_link_delay = 0;
+    uint64_t total_inject_delay = 0;
+    uint64_t total_distance = 0;
+    double avg_delay = 0;
+    std::mutex local_mutex;
+};
 
-    MPI_Finalize();
-}
+
+#endif //NETWORK_H

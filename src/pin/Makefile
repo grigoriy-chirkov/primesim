@@ -1,3 +1,4 @@
+
 ###########################################################################
 #Copyright (c) 2015 Princeton University
 #All rights reserved.
@@ -26,17 +27,57 @@
 ##############################################################################
 
 
-all: bin/prime.so bin/pin_wrapper bin/prime
+PIN_VERSION_SCRIPT = $(shell find $(PINPATH) -name pintool.ver)
 
-bin/prime.so: src/pin/* src/*
-	cd src/pin && $(MAKE)
+CC := icc
+CXX := icpc
 
-bin/pin_wrapper: src/pin_wrapper/* src/*
-	cd src/pin_wrapper && $(MAKE)
+OUT := $(PRIME_PATH)/bin/prime.so 
+CXX_FILES := $(notdir $(wildcard *.cpp ../*.cpp))
+O_FILES := $(CXX_FILES:%.cpp=$(PRIME_PATH)/obj/pin/%.o)
 
-bin/prime: src/sim/* src/*
-	cd src/sim && $(MAKE)
+CXX_FLAGS := -std=c++17 -Wall -Werror -O2 -g -I.. \
+            -fomit-frame-pointer \
+           -fno-stack-protector -fno-strict-aliasing \
+           -D_GLIBCXX_USE_CXX11_ABI=0 -fabi-version=2 \
+           -DBIGARRAY_MULTIPLIER=1 -DUSING_XED  \
+           -DFUND_TC_TARGETCPU=FUND_CPU_INTEL64 \
+           -DFUND_TC_HOSTCPU=FUND_CPU_INTEL64 \
+           -DFUND_TC_TARGETOS=FUND_OS_LINUX \
+           -DFUND_TC_HOSTOS=FUND_OS_LINUX \
+           -DTARGET_IA32E -DHOST_IA32E \
+           -DTARGET_LINUX \
+           -I$(PINPATH)/source/tools/InstLib \
+           -I$(PINPATH)/extras/xed-intel64/include \
+           -I$(PINPATH)/extras/components/include \
+           -I$(PINPATH)/source/include/pin \
+           -I$(PINPATH)/source/include/pin/gen \
+           -fPIC -DNOMPI
+
+LD_FLAGS := -O2 -g -shared -Wl,--hash-style=sysv -Wl,-Bsymbolic \
+           -Wl,--version-script=$(PIN_VERSION_SCRIPT)  \
+           -Wl,--as-needed \
+           -L$(PINPATH)/intel64/lib \
+           -L$(PINPATH)/intel64/lib-ext  \
+           -L$(PINPATH)/extras/xed-intel64/lib \
+           -L$(PINPATH)/intel64/runtime/glibc \
+           -fPIC -lpin -lxed -lpindwarf 
+           
+
+.PHONY: clean
+
+all: $(OUT)
+
+$(PRIME_PATH)/obj/pin/common.o: ../common.cpp 
+	$(CXX) -c $< -o $@ $(CXX_FLAGS)
+
+$(PRIME_PATH)/obj/pin/%.o: %.cpp 
+	$(CXX) -c $< -o $@ $(CXX_FLAGS)
+
+$(OUT): $(O_FILES)
+	$(CXX) $^ -o $@ $(LD_FLAGS)
+
 
 clean:
-	cd src/sim && $(MAKE) clean && cd ../pin_wrapper && $(MAKE) clean && cd ../pin && $(MAKE) clean
+	rm -f $(O_FILES)  $(OUT) 
 
