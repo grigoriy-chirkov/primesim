@@ -67,26 +67,26 @@ Retranslator::~Retranslator() {
 
 void Retranslator::thread_translator(int tid) {
     auto fifo_fd = open_pipe(tid);
-    auto buf = make_unique<MPIMsg[]>(max_msg_size);
+    auto buf = make_unique<InstMsg[]>(max_msg_size);
     int cid = getCid(tid);
     while (1) {
-        auto bytes_read = read(fifo_fd, buf.get(), sizeof(MPIMsg)*max_msg_size);
+        auto bytes_read = read(fifo_fd, buf.get(), sizeof(InstMsg)*max_msg_size);
         if (bytes_read == 0) break;
         retransmit(buf.get(), cid, bytes_read);
-        if (buf[0].message_type == THREAD_FINISHING) break;
+        if (buf[0].type == InstMsg::THREAD_FINISH) break;
     }
     close(fifo_fd);
 }
 
 void Retranslator::main_server() {
     auto fifo_fd = open_pipe();
-    MPIMsg buf;
-    while (read(fifo_fd, &buf, sizeof(MPIMsg)) != 0) {
-        retransmit(&buf, server_tag, sizeof(MPIMsg));
-        if (buf.message_type == NEW_THREAD) {
+    CtrlMsg buf;
+    while (read(fifo_fd, &buf, sizeof(CtrlMsg)) != 0) {
+        retransmit(&buf, server_tag, sizeof(CtrlMsg));
+        if (buf.type == CtrlMsg::THREAD_START) {
             threads[buf.tid] = thread(&Retranslator::thread_translator, this, buf.tid);
         }
-        if (buf.message_type == PROCESS_FINISHING) {
+        if (buf.type == CtrlMsg::PROCESS_FINISH) {
             break;
         }
     }
@@ -111,7 +111,7 @@ int Retranslator::open_pipe(int tid) {
     return fifo_fd;
 }
 
-void Retranslator::retransmit(MPIMsg* buf, int dst, int size) {
+void Retranslator::retransmit(void* buf, int dst, int size) {
     MPI_Ssend(buf, size, MPI_CHAR, 0, dst, comm);
 }
 

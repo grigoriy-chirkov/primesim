@@ -46,7 +46,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "mpi.h"
 
 struct alignas(64) CoreData {
-    MPIMsg* msgs = NULL;
+    InstMsg* msgs = NULL;
     uint64_t in_pos = 0;
     uint64_t out_pos = 0;
     uint64_t count = 0;
@@ -70,8 +70,8 @@ struct alignas(64) CoreData {
 
     void init(int _cid, int _pid, int _tid, uint64_t _cycle, int max_msg_size);
     ~CoreData();
-    void insert_msg(const MPIMsg* inbuffer, size_t num);
-    size_t eject_msg(MPIMsg* outbuffer, size_t num);
+    void insert_msg(const InstMsg* inbuffer, size_t num);
+    size_t eject_msg(InstMsg* outbuffer, size_t num);
     void report(std::ofstream& report_ofstream);
 
     inline size_t empty_count() {

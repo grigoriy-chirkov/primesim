@@ -35,8 +35,10 @@ CXX := icpc
 OUT := $(PRIME_PATH)/bin/prime.so 
 CXX_FILES := $(notdir $(wildcard *.cpp ../*.cpp))
 O_FILES := $(CXX_FILES:%.cpp=$(PRIME_PATH)/obj/pin/%.o)
+OPT := -O3 -g
 
-CXX_FLAGS := -std=c++17 -Wall -Werror -O2 -g -I.. \
+
+CXX_FLAGS := -std=c++17 -Wall -Werror $(OPT) -I.. \
             -fomit-frame-pointer \
            -fno-stack-protector -fno-strict-aliasing \
            -D_GLIBCXX_USE_CXX11_ABI=0 -fabi-version=2 \
@@ -54,7 +56,7 @@ CXX_FLAGS := -std=c++17 -Wall -Werror -O2 -g -I.. \
            -I$(PINPATH)/source/include/pin/gen \
            -fPIC -DNOMPI
 
-LD_FLAGS := -O2 -g -shared -Wl,--hash-style=sysv -Wl,-Bsymbolic \
+LD_FLAGS := $(OPT) -shared -Wl,--hash-style=sysv -Wl,-Bsymbolic \
            -Wl,--version-script=$(PIN_VERSION_SCRIPT)  \
            -Wl,--as-needed \
            -L$(PINPATH)/intel64/lib \

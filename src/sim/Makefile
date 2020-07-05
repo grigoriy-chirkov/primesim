@@ -36,9 +36,11 @@ OUT := $(PRIME_PATH)/bin/prime
 CXX_FILES := $(notdir $(wildcard *.cpp ../*.cpp)) 
 CXX_FILES += $(wildcard Graphite/*.cpp)
 O_FILES := $(CXX_FILES:%.cpp=$(PRIME_PATH)/obj/sim/%.o)
+OPT := -O3 -g
 
-CXX_FLAGS := -std=c++17 -Wall -Werror -O2 -g $(shell xml2-config --cflags) -I$(GRAPHITE_PATH) -I..
-LD_FLAGS :=  -O2 -g $(shell xml2-config --libs)
+
+CXX_FLAGS := -std=c++17 -Wall -Werror $(OPT) $(shell xml2-config --cflags) -I$(GRAPHITE_PATH) -I..
+LD_FLAGS :=  $(OPT) $(shell xml2-config --libs)
 
 
 .PHONY: clean

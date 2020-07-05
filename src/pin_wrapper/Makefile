@@ -32,11 +32,12 @@ MPICXX := mpicxx
 OUT := $(PRIME_PATH)/bin/pin_wrapper
 CXX_FILES := $(notdir $(wildcard *.cpp ../*.cpp))
 O_FILES := $(CXX_FILES:%.cpp=$(PRIME_PATH)/obj/pin_wrapper/%.o)
+OPT := -O3 -g
 
-CXX_FLAGS := -std=c++17 -Wall -Werror -O2 -g -I.. \
+CXX_FLAGS := -std=c++17 -Wall -Werror $(OPT) -I.. \
              -DPIN=\"$(shell which pinbin)\" \
              -DPRIMELIB=\"$(PRIME_PATH)/bin/prime.so\"
-LD_FLAGS :=  -O2 -g 
+LD_FLAGS :=  $(OPT)
 
 .PHONY: clean
 

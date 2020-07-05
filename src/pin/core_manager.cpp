@@ -51,20 +51,17 @@ CoreManager::CoreManager(int _pid, int _max_msg_size) :
 
 void CoreManager::startSim()
 {
-    fifo_fd = createPipe();
-    MPIMsg msg;
-    msg.populate_control(PROCESS_STARTING, 0, pid);
-    write(fifo_fd, &msg, sizeof(MPIMsg));
+    createPipe();
+    CtrlMsg msg{CtrlMsg::PROCESS_START, pid, 0};
+    write(fifo_fd, &msg, sizeof(CtrlMsg));
 }
 
 void CoreManager::finishSim(int32_t code, void *v)
 {
-    MPIMsg msg;
-    msg.populate_control(PROCESS_FINISHING, 0, pid);
-    write(fifo_fd, &msg, sizeof(MPIMsg));
+    CtrlMsg msg{CtrlMsg::PROCESS_FINISH, pid, 0};
+    write(fifo_fd, &msg, sizeof(CtrlMsg));
     close(fifo_fd);
 }      
-
 
 // This routine is executed every time a thread starts.
 void CoreManager::threadStart(THREADID tid, CONTEXT *ctxt, int32_t flags, void *v)
@@ -73,78 +70,29 @@ void CoreManager::threadStart(THREADID tid, CONTEXT *ctxt, int32_t flags, void *
         cerr << "Error: the number of threads exceeds the limit!\n";
     }
 
-    MPIMsg msg;
-    msg.populate_control(NEW_THREAD, tid, pid);
-    write(fifo_fd, &msg, sizeof(MPIMsg));
-    thread_data[tid].init(max_msg_size, createPipe(tid));
+    CtrlMsg msg{CtrlMsg::THREAD_START, pid, tid};
+    write(fifo_fd, &msg, sizeof(CtrlMsg));
+    thread_data[tid].start(pid, tid, max_msg_size);
 }
 
 
 // This routine is executed every time a thread is destroyed.
 void CoreManager::threadFini(THREADID tid, const CONTEXT *ctxt, int32_t code, void *v)
 {
-    auto& tdata = thread_data[tid];
-    //Send out all remaining memory requests in the buffer
-    if(tdata.mpi_pos > 1) {
-        drainMemReqs(tid);
-    }
-
-    tdata.thread_state = FINISH;
-    MPIMsg msg;
-    msg.populate_control(THREAD_FINISHING, tid, pid);
-    write(tdata.fifo_fd, &msg, sizeof(MPIMsg));
-    close(tdata.fifo_fd);
+    CtrlMsg msg{CtrlMsg::THREAD_FINISH, pid, tid};
+    write(fifo_fd, &msg, sizeof(CtrlMsg));
+    thread_data[tid].finish();
 }
 
-
-// Handle non-memory instructions
-void CoreManager::execNonMem(uint32_t ins_count_in, THREADID tid)
-{
-    thread_data[tid].ins_nonmem += ins_count_in;
-}
-
-
-// Handle a memory instruction
-void CoreManager::execMem(void * addr, THREADID tid, uint32_t size, BOOL mem_type)
-{
-    ThreadData& tdata = thread_data[tid];
-    MPIMsg& msg = tdata.msgs[tdata.mpi_pos];
-    msg.populate_mem(mem_type, uint64_t(addr), tdata.ins_nonmem);
-    tdata.ins_nonmem = 0;
-    tdata.mpi_pos++;
-    if (tdata.mpi_pos >= max_msg_size) {
-        drainMemReqs(tid);
-    }
-}
-
-int CoreManager::createPipe() const
+void CoreManager::createPipe()
 {
     auto fifo_name = string("/scratch/prime_fifo_") + to_string(pid);
     mkfifo(fifo_name.c_str(), S_IRUSR | S_IWUSR);
-    auto ret = open(fifo_name.c_str(), O_WRONLY);
-    assert(ret != -1);
-    return ret;
+    fifo_fd = open(fifo_name.c_str(), O_WRONLY);
+    assert(fifo_fd != -1);
 }
 
-int CoreManager::createPipe(THREADID tid) const
-{
-    auto fifo_name = string("/scratch/prime_fifo_") + to_string(pid) + "_" + to_string(tid);
-    mkfifo(fifo_name.c_str(), S_IRUSR | S_IWUSR);
-    auto ret = open(fifo_name.c_str(), O_WRONLY);
-    assert(ret != -1);
-    fcntl(ret, F_SETPIPE_SZ, sizeof(MPIMsg) * max_msg_size);
-    return ret;
-}
-
-void CoreManager::drainMemReqs(THREADID tid) 
-{
-    ThreadData& tdata = thread_data[tid];
-    tdata.msgs[0].populate_control(MEM_REQUESTS, tid, pid);
-    write(tdata.fifo_fd, tdata.msgs.data(), tdata.mpi_pos * sizeof(MPIMsg));    
-    tdata.mpi_pos = 1;
-}
-
-bool CoreManager::isLock(ADDRINT num, ADDRINT arg1) const
+bool isLock(ADDRINT num, ADDRINT arg1)
 {
     switch (num) {
         case SYS_futex:
@@ -171,30 +119,20 @@ bool CoreManager::isLock(ADDRINT num, ADDRINT arg1) const
 // Called before syscalls
 void CoreManager::sysBefore(ADDRINT num, ADDRINT arg1, THREADID tid)
 {
-    if (isLock(num, arg1)) { 
-        auto& tdata = thread_data[tid];
-        if(tdata.thread_state == ACTIVE) {
-            if(tdata.mpi_pos > 1) {
-                drainMemReqs(tid);
-            }
-            
-            tdata.thread_state = LOCKED;
-            MPIMsg msg;
-            msg.populate_control(THREAD_LOCK, tid, pid);
-            write(tdata.fifo_fd, &msg, sizeof(MPIMsg));
-        }
+    if (isLock(num, arg1)) {
+        CtrlMsg msg{CtrlMsg::THREAD_LOCK, pid, tid};
+        write(fifo_fd, &msg, sizeof(CtrlMsg));
+        thread_data[tid].sysBefore(num, arg1);
     }
 }
 
 // Called after syscalls
 void CoreManager::sysAfter(THREADID tid)
 {
-    auto& tdata = thread_data[tid];
-    if (tdata.thread_state == LOCKED) {
-        tdata.thread_state = ACTIVE;
-        MPIMsg msg;
-        msg.populate_control(THREAD_UNLOCK, tid, pid);
-        write(tdata.fifo_fd, &msg, sizeof(MPIMsg));
+    if (thread_data[tid].state == ThreadData::LOCKED){
+        CtrlMsg msg{CtrlMsg::THREAD_UNLOCK, pid, tid};
+        write(fifo_fd, &msg, sizeof(CtrlMsg));
+        thread_data[tid].sysAfter();  
     }
 }
 
@@ -225,3 +163,77 @@ void CoreManager::syscallExit(THREADID threadIndex, CONTEXT *ctxt, SYSCALL_STAND
 //         write(tdata.fifo_fd, &msg, sizeof(MPIMsg));
 //     }
 // }
+
+
+void ThreadData::start(int _pid, int _tid, int _max_msg_size)
+{
+    valid = true;
+    pid = _pid;
+    tid = _tid;
+    max_msg_size = _max_msg_size; 
+    msgs = std::vector<InstMsg>(max_msg_size);
+    valid = true;
+    state = ACTIVE;
+    createPipe();
+    addMsg(InstMsg::THREAD_START);
+}
+
+void ThreadData::finish()
+{
+    state = FINISH;
+    addMsg(InstMsg::THREAD_FINISH);
+    drainMsgs();
+    close(fifo_fd);
+}
+
+void ThreadData::addMsg(InstMsg::Type type, uint64_t addr) 
+{
+    assert(pos < max_msg_size);
+    if (isMem(type)) {
+        msgs[pos] = {type, addr, ins_nonmem};        
+        ins_nonmem = 0;
+    } else {
+        msgs[pos] = {type, 0, 0};
+    }
+    pos++;
+    if (isMem(type) && (pos >= (max_msg_size - 4))) {
+        drainMsgs();
+    }
+}
+
+void ThreadData::drainMsgs() 
+{
+    write(fifo_fd, msgs.data(), pos * sizeof(InstMsg));
+    pos = 0;
+}
+
+void ThreadData::createPipe()
+{
+    auto fifo_name = string("/scratch/prime_fifo_") + to_string(pid) + "_" + to_string(tid);
+    mkfifo(fifo_name.c_str(), S_IRUSR | S_IWUSR);
+    fifo_fd = open(fifo_name.c_str(), O_WRONLY);
+    assert(fifo_fd != -1);
+    fcntl(fifo_fd, F_SETPIPE_SZ, sizeof(InstMsg) * max_msg_size);
+}
+
+void ThreadData::addNonMem(uint32_t ins_count_in) 
+{
+    ins_nonmem += ins_count_in;
+}
+
+// Called before syscalls
+void ThreadData::sysBefore(ADDRINT num, ADDRINT arg1)
+{
+    if (isLock(num, arg1) && (state = ACTIVE)) { 
+        state = LOCKED;
+        addMsg(InstMsg::THREAD_LOCK);
+    }
+}
+
+void ThreadData::sysAfter()
+{
+    if (state == LOCKED) {
+        state = ACTIVE;
+        addMsg(InstMsg::THREAD_UNLOCK);
+    }
+}

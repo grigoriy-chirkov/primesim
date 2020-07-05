@@ -40,66 +40,58 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 constexpr int MAX_THREADS_PER_PROCESS = 2048;
 
 
-enum MessageType
+// enum MessageType
+// {
+//     WRONG=0,
+//     PROCESS_START = 1,
+//     PROCESS_FINISH = 2,
+//     THREAD_START = 3,
+//     THREAD_FINISH = 4,
+//     THREAD_LOCK = 5,
+//     THREAD_UNLOCK = 6, 
+//     MEM_RD = 7,
+//     MEM_WR = 8,
+//     TERMINATE = 9
+// };
+
+struct CtrlMsg
 {
-    WRONG=0,
-    MEM_REQUESTS = 9,
-    PROCESS_STARTING = 3,
-    PROCESS_FINISHING = 1,
-    NEW_THREAD = 4,
-    THREAD_FINISHING = 8,
-    PROGRAM_EXITING = 5,
-    THREAD_LOCK = 6,
-    THREAD_UNLOCK = 7, 
-    TERMINATE = 2
+    enum Type {
+        WRONG = 0,
+        PROCESS_START = 1,
+        PROCESS_FINISH = 2,
+        THREAD_START = 3,
+        THREAD_FINISH = 4,
+        THREAD_LOCK = 5,
+        THREAD_UNLOCK = 6 
+    };
+    Type type = WRONG;
+    int pid = 0;
+    int tid = 0;
 };
 
 #pragma pack(push)  /* push current alignment to stack */
 #pragma pack(1)     /* set alignment to 1 byte boundary */
-struct MPIMsg
-{   
-    bool is_control; 
-    union {
-        struct { // control msg
-            MessageType  message_type;
-            int          tid;
-            int          pid;
-        }; 
-        struct { // mem msg
-            bool        mem_type; //1 means write, 0 means read
-            uint64_t    addr_dmem; 
-            uint32_t    ins_before;
-        }; 
-    }; 
-    void populate_control(MessageType _message_type, int _tid, int _pid) {
-        is_control = true;
-        message_type = _message_type;
-        tid = _tid;
-        pid = _pid;
+struct InstMsg
+{
+    enum Type {
+        WRONG = 0,
+        THREAD_START = 1,
+        THREAD_FINISH = 2,
+        THREAD_LOCK = 3,
+        THREAD_UNLOCK = 4, 
+        MEM_RD = 5,
+        MEM_WR = 6,
+        TERMINATE = 7
     };
-    void populate_mem(bool _mem_type, uint64_t _addr_dmem, uint32_t _ins_before) {
-        is_control = false;
-        mem_type = _mem_type;
-        addr_dmem = _addr_dmem;
-        ins_before = _ins_before;
-    };
+    Type        type = WRONG;
+    uint64_t    addr = 0; 
+    uint32_t    ins_before = 0;
 
-    MPIMsg() {
-        populate_control(WRONG, 0, 0);
-        populate_mem(false, 0, 0);
-    };
-} ;
+    inline bool isWr() { return type == MEM_WR; };
+};
 #pragma pack(pop)   /* restore original alignment from stack */
 
-
-enum ThreadState
-{
-    DEAD    = 0,
-    ACTIVE  = 1,
-    LOCKED  = 2,
-    FINISH  = 3,
-    WAIT    = 4
-};
 
 #ifndef NOMPI
 constexpr int server_tag = MPI_TAG_UB;

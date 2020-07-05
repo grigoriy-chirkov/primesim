@@ -48,7 +48,7 @@ struct Retranslator {
     void thread_translator(int tid);
     int open_pipe();
     int open_pipe(int tid);
-    void retransmit(MPIMsg* buf, int dst, int count);
+    void retransmit(void* buf, int dst, int count);
     int getCid(int tid);
     void collect_threads();
 };

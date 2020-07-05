@@ -52,14 +52,13 @@ KNOB<int> KnobPID(KNOB_MODE_WRITEONCE, "pintool",
     "p", "1", "specify pid of current process");
 
 // Handle non-memory instructions
-// void PIN_FAST_ANALYSIS_CALL execNonMem(uint32_t ins_count, THREADID threadid)
-void execNonMem(uint32_t ins_count, THREADID threadid)
+inline void execNonMem(uint32_t ins_count, THREADID threadid)
 {
     core_manager->execNonMem(ins_count, threadid);
 }
 
 // Handle a memory instruction
-void execMem(void * addr, THREADID threadid, uint32_t size, bool mem_type)
+inline void execMem(void * addr, THREADID threadid, uint32_t size, bool mem_type)
 {
     core_manager->execMem(addr, threadid, size, mem_type);
 }
@@ -70,25 +69,25 @@ void execMem(void * addr, THREADID threadid, uint32_t size, bool mem_type)
 // } 
 
 // This routine is executed every time a thread starts.
-void ThreadStart(THREADID threadid, CONTEXT *ctxt, int32_t flags, void *v)
+inline void ThreadStart(THREADID threadid, CONTEXT *ctxt, int32_t flags, void *v)
 {
     core_manager->threadStart(threadid, ctxt, flags, v);
 }
 
 // This routine is executed every time a thread is destroyed.
-void ThreadFini(THREADID threadid, const CONTEXT *ctxt, int32_t code, void *v)
+inline void ThreadFini(THREADID threadid, const CONTEXT *ctxt, int32_t code, void *v)
 {
     core_manager->threadFini(threadid, ctxt, code, v);
 }
 
 // Enter a syscall
-void SyscallEntry(THREADID threadIndex, CONTEXT *ctxt, SYSCALL_STANDARD std, void *v)
+inline void SyscallEntry(THREADID threadIndex, CONTEXT *ctxt, SYSCALL_STANDARD std, void *v)
 {
     core_manager->syscallEntry(threadIndex, ctxt, std, v);
 }
 
 // Exit a syscall
-void SyscallExit(THREADID threadIndex, CONTEXT *ctxt, SYSCALL_STANDARD std, void *v)
+inline void SyscallExit(THREADID threadIndex, CONTEXT *ctxt, SYSCALL_STANDARD std, void *v)
 {
     core_manager->syscallExit(threadIndex, ctxt, std, v);
 }
@@ -165,14 +164,14 @@ void Trace(TRACE trace, void *v)
 
 
 
-void Start(void *v)
+inline void Start(void *v)
 {
     core_manager = new CoreManager(KnobPID.Value(), KnobMaxMsgSize.Value());
     core_manager->startSim();
 
 }
 
-void Fini(int32_t code, void *v)
+inline void Fini(int32_t code, void *v)
 {
     core_manager->finishSim(code, v);
     delete core_manager;

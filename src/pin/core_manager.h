@@ -46,21 +46,38 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 struct alignas(64) ThreadData {
-    uint32_t ins_nonmem = 0;
-    std::vector<MPIMsg> msgs;
-    int mpi_pos = 1;
-    ThreadState thread_state = DEAD;
-    bool valid = false;
-    int cid = -1;
-    int fifo_fd = -1;
-
-    void init(int max_msg_size, int _fifo_fd) {
-        msgs = std::vector<MPIMsg>(max_msg_size);
-        valid = true;
-        thread_state = ACTIVE;
-        fifo_fd = _fifo_fd;
+    enum State
+    {
+        DEAD    = 0,
+        ACTIVE  = 1,
+        LOCKED  = 2,
+        FINISH  = 3
     };
-} ;
+
+    uint32_t ins_nonmem = 0;
+    std::vector<InstMsg> msgs;
+    int pos = 0;
+    State state = DEAD;
+    int fifo_fd = -1;
+    bool valid = false;
+    int pid = -1;
+    int tid = -1;
+    int max_msg_size = 0;
+
+    void start(int pid, int tid, int max_msg_size);
+    void finish();
+    void addMsg(InstMsg::Type type, uint64_t addr = 0);
+    void addNonMem(uint32_t ins_count_in);
+    void sysBefore(ADDRINT num, ADDRINT arg1);
+    void sysAfter();
+    static inline bool isMem(InstMsg::Type type) {
+        return ((type == InstMsg::MEM_RD) || (type == InstMsg::MEM_WR));
+    };
+
+private:
+    void drainMsgs();
+    void createPipe();
+};
 
 class CoreManager
 {
@@ -68,19 +85,22 @@ class CoreManager
         CoreManager(int pid, int max_msg_size);
         void startSim();
         void finishSim(int32_t code, void *v);
-        void execNonMem(uint32_t ins_count_in, THREADID threadid);
-        void execMem(void * addr, THREADID threadid, uint32_t size, bool mem_type);
         void threadStart(THREADID threadid, CONTEXT *ctxt, int32_t flags, void *v);
         void threadFini(THREADID threadid, const CONTEXT *ctxt, int32_t code, void *v);
         // void syscallEntry(THREADID threadid);
         void syscallEntry(THREADID threadIndex, CONTEXT *ctxt, SYSCALL_STANDARD std, void *v);
         void syscallExit(THREADID threadIndex, CONTEXT *ctxt, SYSCALL_STANDARD std, void *v);
+        
+        inline void execNonMem(uint32_t ins_count_in, THREADID threadid) {
+            thread_data[threadid].addNonMem(ins_count_in);
+        };
+        inline void execMem(void * addr, THREADID threadid, uint32_t size, bool mem_type){
+            thread_data[threadid].addMsg(mem_type ? InstMsg::MEM_WR : InstMsg::MEM_RD, uint64_t(addr));
+        };
+
     private:
         CoreManager() = delete;
-        void drainMemReqs(THREADID threadid);
-        int createPipe(THREADID tid) const;
-        int createPipe() const;
-        bool isLock(ADDRINT num, ADDRINT arg1) const;
+        void createPipe();
         void sysBefore(ADDRINT num, ADDRINT arg1, THREADID threadid);
         void sysAfter(THREADID threadid);
 
