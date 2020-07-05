@@ -90,8 +90,8 @@ struct alignas(64) CacheLevel
         num_caches(_num_caches),
         access_time(_access_time),
         size(_size),
-        block_size(_block_size),
-        num_ways(_num_ways)
+        num_ways(_num_ways),
+        block_size(_block_size)
     {};
 
     CacheLevel() = delete;

@@ -113,15 +113,14 @@ private:
     std::atomic<int> next_empty_core = 0;
     std::atomic<uint64_t> cur_segment = 0;
 
-    const int max_msg_size;
-    const int num_cons_threads;
-    const int num_prod_threads;
-    const uint64_t thread_sync_interval;
-    const double cpi_nonmem;
-    const double freq;
+    const int max_msg_size = 0;
+    const int num_cons_threads = 0;
+    const int num_prod_threads = 0;
+    const uint64_t thread_sync_interval = 0;
+    const double cpi_nonmem = 0;
+    const double freq = 0;
 
     uint64_t getCycle() const;
-    double getAvgCycle() const;
     void getSimStartTime();
     void getSimFinishTime();
 

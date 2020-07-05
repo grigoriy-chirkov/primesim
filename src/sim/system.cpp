@@ -48,18 +48,18 @@ inline int getNumCoresOnLevel(int num_cores, const XmlSys& xml_sys, int level) {
 } 
 
 System::System(const XmlSys& xml_sys_in) : 
-    xml_sys(xml_sys_in),
     sys_type(xml_sys_in.sys_type),
     protocol_type(xml_sys_in.protocol_type),
     protocol(xml_sys_in.protocol),
+    max_num_sharers(xml_sys_in.max_num_sharers),
     num_cores(xml_sys_in.num_cores),
     dram_access_time(xml_sys_in.dram_access_time),
+    num_levels(xml_sys_in.num_levels),
     page_size(xml_sys_in.page_size),
     tlb_enable(xml_sys_in.tlb_enable),
     shared_llc(xml_sys_in.shared_llc),
-    num_levels(xml_sys_in.num_levels),
     verbose_report(xml_sys_in.verbose_report),
-    max_num_sharers(xml_sys_in.max_num_sharers),
+    xml_sys(xml_sys_in),
     network(getNumCoresOnLevel(num_cores, xml_sys_in, xml_sys_in.num_levels-1), xml_sys.network, xml_sys_in.verbose_report)
 {
     total_bus_contention = 0;

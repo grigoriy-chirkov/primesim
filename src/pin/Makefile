@@ -38,7 +38,7 @@ O_FILES := $(CXX_FILES:%.cpp=$(PRIME_PATH)/obj/pin/%.o)
 OPT := -O3 -g
 
 
-CXX_FLAGS := -std=c++17 -Wall -Werror $(OPT) -I.. \
+CXX_FLAGS := -std=c++14 -Wall -Werror $(OPT) -I.. \
             -fomit-frame-pointer \
            -fno-stack-protector -fno-strict-aliasing \
            -D_GLIBCXX_USE_CXX11_ABI=0 -fabi-version=2 \

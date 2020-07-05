@@ -47,15 +47,15 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 using namespace std;
 
 UncoreManager::UncoreManager(const XmlSim& xml_sim) :
+    num_cores(xml_sim.sys.num_cores), 
     sys(xml_sim.sys), 
+    core_data(xml_sim.sys.num_cores),
     max_msg_size(xml_sim.max_msg_size),
     num_cons_threads(xml_sim.num_cons_threads),
     num_prod_threads(xml_sim.num_prod_threads),
     thread_sync_interval(xml_sim.thread_sync_interval),
     cpi_nonmem(xml_sim.sys.cpi_nonmem),
-    freq(xml_sim.sys.freq), 
-    num_cores(xml_sim.sys.num_cores), 
-    core_data(xml_sim.sys.num_cores)
+    freq(xml_sim.sys.freq) 
 {
     int rc = MPI_Comm_dup(MPI_COMM_WORLD, &comm);    
     if (rc != MPI_SUCCESS) {

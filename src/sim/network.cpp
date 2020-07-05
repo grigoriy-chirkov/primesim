@@ -43,13 +43,13 @@ using namespace std;
 
 Network::Network(int num_nodes_in, const XmlNetwork& xml_net, bool _verbose_report) : 
     num_nodes(num_nodes_in),
+    net_width((int)ceil(sqrt(num_nodes))), 
     header_flits(xml_net.header_flits),
+    verbose_report(_verbose_report),
     data_width(xml_net.data_width),
     router_delay(xml_net.router_delay),
     link_delay(xml_net.link_delay),
-    inject_delay(xml_net.inject_delay),
-    net_width((int)ceil(sqrt(num_nodes))), 
-    verbose_report(_verbose_report)
+    inject_delay(xml_net.inject_delay)
 {
     link = new Link** [net_width-1];
     for (int i = 0; i < net_width-1; i++) {
