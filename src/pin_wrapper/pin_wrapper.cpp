@@ -100,11 +100,11 @@ parse_args(int argc, char** argv) {
 void run_pin(int argc, char** argv, int pid, int max_msg_size) {
     constexpr int max_args = 100;
     char* new_argv[max_args];
-    new_argv[0] = PIN; new_argv[1] = "-ifeellucky";
-    new_argv[2] = "-t"; new_argv[3] = PRIMELIB;
-    new_argv[4] = "-l"; new_argv[5] = strdup(to_string(max_msg_size).c_str());
-    new_argv[6] = "-p"; new_argv[7] = strdup(to_string(pid).c_str());
-    new_argv[8] = "--"; 
+    new_argv[0] = strdup(PIN); new_argv[1] = strdup("-ifeellucky");
+    new_argv[2] = strdup("-t"); new_argv[3] = strdup(PRIMELIB);
+    new_argv[4] = strdup("-l"); new_argv[5] = strdup(to_string(max_msg_size).c_str());
+    new_argv[6] = strdup("-p"); new_argv[7] = strdup(to_string(pid).c_str());
+    new_argv[8] = strdup("--"); 
     int cur_idx = 9;
     for(; optind < argc; optind++){      
         assert(cur_idx < max_args);
