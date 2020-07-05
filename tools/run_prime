@@ -49,7 +49,7 @@ def get_max_msg_size(config_file : str):
     return root.find("max_msg_size").text
 
 
-def run_prime_slurm(config_path : str, output_path : str, progs : list, dry : bool, background : bool, params : str):
+def run_prime_slurm(config_path : str, output_path : str, threads : str, progs : list, dry : bool, background : bool, params : str):
     config_path = path.abspath(config_path)
     output_path = path.abspath(output_path)
     max_msg_size = get_max_msg_size(config_path)
@@ -60,42 +60,63 @@ def run_prime_slurm(config_path : str, output_path : str, progs : list, dry : bo
       prime_cmd_with_args = "%s %s %s" % (prime_exe , config_path , output_path)
       f.write("0 %s\n" % prime_cmd_with_args)
       for rank, prog in enumerate(progs, start=1):
-        pinwrapper_cmd_with_args = "%s -p %d -l %s -c %s\n" % (pinwrapper_exe, rank, max_msg_size, prog)
+        if prog[:7] == 'parsec.':
+          pinwrapper_cmd_with_args = "parsecmgmt -a run -c icc -i simsmall -k -s '%s -p %d -l %s ' -p %s -n %s \n" % (pinwrapper_exe, rank, max_msg_size, prog, threads)
+        else:
+          pinwrapper_cmd_with_args = "%s -p %d -l %s %s\n" % (pinwrapper_exe, rank, max_msg_size, prog)
         f.write("%d %s" % (rank, pinwrapper_cmd_with_args))
 
     if background:
       batch_filename = path.join(prime_path, "batch", task_id)
       with open(batch_filename, "w") as f:
         f.write("#!/bin/bash\n")
+        f.write("export OMP_NUM_THREADS=%s\n" % threads)
         f.write("srun --multi-prog %s\n" % task_filename)
       cmd = ["sbatch", "-n%d" % (len(progs)+1), "-o%s" % (output_path+'.log')] + params.split(' ') + [batch_filename]
 
     else:
       cmd = ["srun"] + params.split(' ') + ["--multi-prog", task_filename]
     
+    if not background:
+      print("export OMP_NUM_THREADS=%s" % threads)
     for word in cmd:
       print(word, end=" ")
-    print('')
+    print("")
     if not dry:
+      if not background:
+        os.environ["OMP_NUM_THREADS"] = threads
       os.execvp(cmd[0], cmd)
 
 
-def run_prime_locally(config_path : str, output_path : str, progs : list, dry : bool):
+def run_prime_locally(config_path : str, output_path : str, threads : str, progs : list, dry : bool):
     config_path = path.abspath(config_path)
     output_path = path.abspath(output_path)
     max_msg_size = get_max_msg_size(config_path)
 
     cmd = ['mpirun', '-n', '1', prime_exe , config_path , output_path]
     for rank, prog in enumerate(progs, start=1):
-        cmd += [':',  '-n', '1', pinwrapper_exe, 
-                '-p', str(rank),
-                '-l', max_msg_size, 
-                '-c', prog]
+        if prog[:7] == 'parsec.':
+          cmd += [':',  '-n', '1', 'parsecmgmt', 
+                  '-a', 'run', 
+                  '-c', 'icc', 
+                  '-i', 'simsmall', 
+                  '-k', 
+                  '-s', "%s -p %d -l %s " % (pinwrapper_exe, rank, max_msg_size), 
+                  '-p', prog, 
+                  '-n', threads]
+        else:
+          cmd += [':',  '-n', '1', pinwrapper_exe, 
+                  '-p', str(rank),
+                  '-l', max_msg_size, 
+                  prog]
     
+    print('export OMP_NUM_THREADS=%s' % threads)
     for word in cmd:
       print(word, end=" "),
-    print('')
+    print("")
+
     if not dry:
+      os.environ['OMP_NUM_THREADS'] = threads
       os.execvp(cmd[0], cmd)
 
 
@@ -108,6 +129,10 @@ def main():
     parser.add_option("-o", "--output_path",
                       dest="output_path", default=prime_path + "/output/config.out",
                       metavar="OUTPUT_PATH", help="write the report to OUTPUT_PATH (default: output/config.out)") 
+
+    parser.add_option("-t", "--threads",
+                       dest="threads", default=1, 
+                       metavar="THREADS", help="number of threads per task")   
 
     parser.add_option("-d", "--dry",
                        dest="dry", default=False, action="store_true",
@@ -129,9 +154,9 @@ def main():
     if len(args) < 1:
         parser.error("You need to specify at least one program to run")
     if not options.local:
-      run_prime_slurm(options.config_path, options.output_path, args, options.dry, options.background, options.params)
+      run_prime_slurm(options.config_path, options.output_path, options.threads, args, options.dry, options.background, options.params)
     else:
-      run_prime_locally(options.config_path, options.output_path, args, options.dry)
+      run_prime_locally(options.config_path, options.output_path, options.threads, args, options.dry)
 
 
 

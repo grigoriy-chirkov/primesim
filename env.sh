@@ -36,4 +36,4 @@ export PRIME_PATH=`pwd`
 export PINPATH=/tigress/gchirkov/pin-2.14-71313-gcc.4.4.7-linux
 
 # set path
-export PATH=$PRIME_PATH/tools:$PINPATH/intel64/bin:$PATH
+export PATH=$PRIME_PATH/bin:$PRIME_PATH/tools:$PINPATH/intel64/bin:$PATH

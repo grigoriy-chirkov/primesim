@@ -36,6 +36,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <fcntl.h>
 #include <cassert>
 #include <thread>
+#include <cstring>
 #include "mpi.h"
 #include "pin_wrapper.h"
 #include "retranslator.h"
@@ -47,15 +48,14 @@ int main(int argc, char** argv)
 {
     int pid = -1;
     int max_msg_size = 1024;
-    string cmd_line;
-    tie(pid, max_msg_size, cmd_line) = parse_args(argc, argv);
+    tie(pid, max_msg_size) = parse_args(argc, argv);
     // Fork must be executed BEFORE MPI_Init
     switch (fork()) { 
         case -1: // error
             cerr << "Couldn't fork Pin process" << endl;
             MPI_Abort(MPI_COMM_WORLD, -1);
         case 0: // child
-            run_pin(pid, max_msg_size, cmd_line);
+            run_pin(argc, argv, pid, max_msg_size);
         default: // parent
             break; 
     }
@@ -75,14 +75,13 @@ void usage() {
     cout << "Usage: ./pipe2mpi -l <max_msg_size> -p <program name>" << endl;
 }
 
-tuple<int, int, string>
+tuple<int, int>
 parse_args(int argc, char** argv) {
     int max_msg_size = 1024;
-    string cmd_line;
     int pid = -1;
     int c = -1;
 
-    while ((c = getopt(argc, argv, "l:c:p:")) != -1) {        
+    while ((c = getopt(argc, argv, "l:p:")) != -1) {        
         switch (c) {
             case 'l':
                 max_msg_size = stoi(optarg);
@@ -90,23 +89,31 @@ parse_args(int argc, char** argv) {
             case 'p':
                 pid = stoi(optarg);
                 break;
-            case 'c':
-                cmd_line = string(optarg);
-                break;
             case '?':
                 usage();
                 MPI_Abort(MPI_COMM_WORLD, -1);
         }
     }
-    return {pid, max_msg_size, cmd_line};
+    return {pid, max_msg_size};
 }
 
-void run_pin(int pid, int max_msg_size, const string& cmd_line) {
-    int rc = execlp(PIN, PIN, "-ifeellucky", 
-           //"-pause_tool", to_string(10).c_str(),
-           "-t", PRIMELIB,
-           "-l", to_string(max_msg_size).c_str(), 
-           "-p", to_string(pid).c_str(), 
-           "--", cmd_line.c_str(), NULL);
+void run_pin(int argc, char** argv, int pid, int max_msg_size) {
+    constexpr int max_args = 100;
+    char* new_argv[max_args];
+    new_argv[0] = PIN; new_argv[1] = "-ifeellucky";
+    new_argv[2] = "-t"; new_argv[3] = PRIMELIB;
+    new_argv[4] = "-l"; new_argv[5] = strdup(to_string(max_msg_size).c_str());
+    new_argv[6] = "-p"; new_argv[7] = strdup(to_string(pid).c_str());
+    new_argv[8] = "--"; 
+    int cur_idx = 9;
+    for(; optind < argc; optind++){      
+        assert(cur_idx < max_args);
+        new_argv[cur_idx] = argv[optind];
+        cur_idx++;
+    } 
+    assert(cur_idx < max_args);
+    new_argv[cur_idx] = NULL;
+
+    int rc = execvp(PIN, new_argv);
     assert(rc > 0); // should never end up here
 }

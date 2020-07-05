@@ -36,8 +36,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "common.h"
 #include <vector>
 
-std::tuple<int, int, std::string> parse_args(int argc, char** argv);
+std::tuple<int, int> parse_args(int argc, char** argv);
 void usage();
-void run_pin(int max_msg_size, int pid, const std::string& cmd_line);
+void run_pin(int argc, char** argv, int max_msg_size, int pid);
 
 #endif
