@@ -42,7 +42,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 using namespace std;
 
-Retranslator::Retranslator(int _pid, int _max_msg_size) : 
+Retranslator::Retranslator(const string& _task_id, int _pid, int _max_msg_size) : 
+    task_id(_task_id),
     pid(_pid), 
     max_msg_size(_max_msg_size)
 {
@@ -94,7 +95,7 @@ void Retranslator::main_server() {
 }
 
 int Retranslator::open_pipe() {
-    auto fifo_name = string("/scratch/prime_fifo_") + to_string(pid);
+    auto fifo_name = string("/scratch/fifo_") + task_id + "_" + to_string(pid);
     int fifo_fd = -1;
     do {
         fifo_fd = open(fifo_name.c_str(), O_RDONLY);
@@ -103,7 +104,7 @@ int Retranslator::open_pipe() {
 }
 
 int Retranslator::open_pipe(int tid) {
-    auto fifo_name = string("/scratch/prime_fifo_") + to_string(pid) + "_" + to_string(tid);
+    auto fifo_name = string("/scratch/fifo_") + task_id + "_" + to_string(pid) + "_" + to_string(tid);
     int fifo_fd = -1;
     do {
         fifo_fd = open(fifo_name.c_str(), O_RDONLY);

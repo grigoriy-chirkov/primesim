@@ -46,23 +46,24 @@ using namespace std;
 
 int main(int argc, char** argv)
 {
+    string task_id;
     int pid = -1;
-    int max_msg_size = 1024;
-    tie(pid, max_msg_size) = parse_args(argc, argv);
+    int max_msg_size = -1;
+    tie(task_id, pid, max_msg_size) = parse_args(argc, argv);
     // Fork must be executed BEFORE MPI_Init
     switch (fork()) { 
         case -1: // error
             cerr << "Couldn't fork Pin process" << endl;
             MPI_Abort(MPI_COMM_WORLD, -1);
         case 0: // child
-            run_pin(argc, argv, pid, max_msg_size);
+            run_pin(argc, argv, task_id, pid, max_msg_size);
         default: // parent
             break; 
     }
     assert(pid == init_mpi(&argc, &argv));
 
     {
-        auto retranslator = make_unique<Retranslator>(pid, max_msg_size);
+        auto retranslator = make_unique<Retranslator>(task_id, pid, max_msg_size);
         retranslator->main_server();
         retranslator->collect_threads();
     }
@@ -72,40 +73,45 @@ int main(int argc, char** argv)
 
 
 void usage() {
-    cout << "Usage: ./pipe2mpi -l <max_msg_size> -p <program name>" << endl;
+    cout << "Usage: ./pipe2mpi -i <task_id> -p <pid> -l <max_msg_size>" << endl;
 }
 
-tuple<int, int>
+tuple<string, int, int>
 parse_args(int argc, char** argv) {
-    int max_msg_size = 1024;
+    string task_id;
     int pid = -1;
+    int max_msg_size = -1;
     int c = -1;
 
-    while ((c = getopt(argc, argv, "l:p:")) != -1) {        
+    while ((c = getopt(argc, argv, "i:p:l:")) != -1) {        
         switch (c) {
-            case 'l':
-                max_msg_size = stoi(optarg);
+            case 'i':
+                task_id = string(optarg);
                 break;
             case 'p':
                 pid = stoi(optarg);
+                break;
+            case 'l':
+                max_msg_size = stoi(optarg);
                 break;
             case '?':
                 usage();
                 MPI_Abort(MPI_COMM_WORLD, -1);
         }
     }
-    return {pid, max_msg_size};
+    return {task_id, pid, max_msg_size};
 }
 
-void run_pin(int argc, char** argv, int pid, int max_msg_size) {
+void run_pin(int argc, char** argv, const string& task_id, int pid, int max_msg_size) {
     constexpr int max_args = 100;
     char* new_argv[max_args];
     new_argv[0] = strdup(PIN); new_argv[1] = strdup("-ifeellucky");
     new_argv[2] = strdup("-t"); new_argv[3] = strdup(PRIMELIB);
-    new_argv[4] = strdup("-l"); new_argv[5] = strdup(to_string(max_msg_size).c_str());
+    new_argv[4] = strdup("-i"); new_argv[5] = strdup(task_id.c_str());
     new_argv[6] = strdup("-p"); new_argv[7] = strdup(to_string(pid).c_str());
-    new_argv[8] = strdup("--"); 
-    int cur_idx = 9;
+    new_argv[8] = strdup("-l"); new_argv[9] = strdup(to_string(max_msg_size).c_str());
+    new_argv[10] = strdup("--"); 
+    int cur_idx = 11;
     for(; optind < argc; optind++){      
         assert(cur_idx < max_args);
         new_argv[cur_idx] = argv[optind];

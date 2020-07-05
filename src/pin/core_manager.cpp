@@ -45,8 +45,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 using namespace std;
 
-CoreManager::CoreManager(int _pid, int _max_msg_size) : 
-    pid(_pid), max_msg_size(_max_msg_size)
+CoreManager::CoreManager(const string& _task_id, int _pid, int _max_msg_size) : 
+    task_id(_task_id), pid(_pid), max_msg_size(_max_msg_size)
 {}
 
 void CoreManager::startSim()
@@ -72,7 +72,7 @@ void CoreManager::threadStart(THREADID tid, CONTEXT *ctxt, int32_t flags, void *
 
     CtrlMsg msg{CtrlMsg::THREAD_START, pid, tid};
     write(fifo_fd, &msg, sizeof(CtrlMsg));
-    thread_data[tid].start(pid, tid, max_msg_size);
+    thread_data[tid].start(task_id, pid, tid, max_msg_size);
 }
 
 
@@ -86,7 +86,7 @@ void CoreManager::threadFini(THREADID tid, const CONTEXT *ctxt, int32_t code, vo
 
 void CoreManager::createPipe()
 {
-    auto fifo_name = string("/scratch/prime_fifo_") + to_string(pid);
+    auto fifo_name = string("/scratch/fifo_") + task_id + "_" + to_string(pid);
     mkfifo(fifo_name.c_str(), S_IRUSR | S_IWUSR);
     fifo_fd = open(fifo_name.c_str(), O_WRONLY);
     assert(fifo_fd != -1);
@@ -165,9 +165,10 @@ void CoreManager::syscallExit(THREADID threadIndex, CONTEXT *ctxt, SYSCALL_STAND
 // }
 
 
-void ThreadData::start(int _pid, int _tid, int _max_msg_size)
+void ThreadData::start(const string& _task_id, int _pid, int _tid, int _max_msg_size)
 {
     valid = true;
+    task_id = _task_id; 
     pid = _pid;
     tid = _tid;
     max_msg_size = _max_msg_size; 
@@ -209,7 +210,7 @@ void ThreadData::drainMsgs()
 
 void ThreadData::createPipe()
 {
-    auto fifo_name = string("/scratch/prime_fifo_") + to_string(pid) + "_" + to_string(tid);
+    auto fifo_name = string("/scratch/fifo_") + task_id + "_" + to_string(pid) + "_" + to_string(tid);
     mkfifo(fifo_name.c_str(), S_IRUSR | S_IWUSR);
     fifo_fd = open(fifo_name.c_str(), O_WRONLY);
     assert(fifo_fd != -1);

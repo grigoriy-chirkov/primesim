@@ -60,11 +60,12 @@ struct alignas(64) ThreadData {
     State state = DEAD;
     int fifo_fd = -1;
     bool valid = false;
+    std::string task_id;
     int pid = -1;
     int tid = -1;
     int max_msg_size = 0;
 
-    void start(int pid, int tid, int max_msg_size);
+    void start(const std::string& task_id, int pid, int tid, int max_msg_size);
     void finish();
     void addMsg(InstMsg::Type type, uint64_t addr = 0);
     void addNonMem(uint32_t ins_count_in);
@@ -82,7 +83,7 @@ private:
 class CoreManager
 {
     public:
-        CoreManager(int pid, int max_msg_size);
+        CoreManager(const std::string& task_id, int pid, int max_msg_size);
         void startSim();
         void finishSim(int32_t code, void *v);
         void threadStart(THREADID threadid, CONTEXT *ctxt, int32_t flags, void *v);
@@ -105,8 +106,9 @@ class CoreManager
         void sysAfter(THREADID threadid);
 
         std::array<ThreadData, MAX_THREADS_PER_PROCESS> thread_data;
-        const int max_msg_size = -1;
+        const std::string task_id;
         const int pid = -1;
+        const int max_msg_size = -1;
         int fifo_fd = -1;
 };
 

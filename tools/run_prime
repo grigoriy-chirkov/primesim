@@ -53,7 +53,7 @@ def run_prime_slurm(config_path : str, output_path : str, threads : str, progs :
     config_path = path.abspath(config_path)
     output_path = path.abspath(output_path)
     max_msg_size = get_max_msg_size(config_path)
-    task_id = datetime.now().strftime("prime_%d_%m_%Y-%H%M%S")
+    task_id = datetime.now().strftime("p_%d%m%Y-%H%M%S")
 
     task_filename = path.join(prime_path, "cmd", task_id)
     with open(task_filename, "w") as f:
@@ -61,9 +61,9 @@ def run_prime_slurm(config_path : str, output_path : str, threads : str, progs :
       f.write("0 %s\n" % prime_cmd_with_args)
       for rank, prog in enumerate(progs, start=1):
         if prog[:7] == 'parsec.':
-          pinwrapper_cmd_with_args = "parsecmgmt -a run -c icc -i simsmall -k -s '%s -p %d -l %s ' -p %s -n %s \n" % (pinwrapper_exe, rank, max_msg_size, prog, threads)
+          pinwrapper_cmd_with_args = "parsecmgmt -a run -c icc -i simsmall -k -s '%s -i %s -p %d -l %s ' -p %s -n %s \n" % (pinwrapper_exe, task_id, rank, max_msg_size, prog, threads)
         else:
-          pinwrapper_cmd_with_args = "%s -p %d -l %s %s\n" % (pinwrapper_exe, rank, max_msg_size, prog)
+          pinwrapper_cmd_with_args = "%s -i %s -p %d -l %s %s\n" % (pinwrapper_exe, task_id, rank, max_msg_size, prog)
         f.write("%d %s" % (rank, pinwrapper_cmd_with_args))
 
     if background:
@@ -92,6 +92,7 @@ def run_prime_locally(config_path : str, output_path : str, threads : str, progs
     config_path = path.abspath(config_path)
     output_path = path.abspath(output_path)
     max_msg_size = get_max_msg_size(config_path)
+    task_id = datetime.now().strftime("p_%d%m%Y-%H%M%S")
 
     cmd = ['mpirun', '-n', '1', prime_exe , config_path , output_path]
     for rank, prog in enumerate(progs, start=1):
@@ -101,11 +102,12 @@ def run_prime_locally(config_path : str, output_path : str, threads : str, progs
                   '-c', 'icc', 
                   '-i', 'simsmall', 
                   '-k', 
-                  '-s', "%s -p %d -l %s " % (pinwrapper_exe, rank, max_msg_size), 
+                  '-s', "%s -i %s -p %d -l %s " % (pinwrapper_exe, task_id, rank, max_msg_size), 
                   '-p', prog, 
                   '-n', threads]
         else:
           cmd += [':',  '-n', '1', pinwrapper_exe, 
+                  '-i', task_id,
                   '-p', str(rank),
                   '-l', max_msg_size, 
                   prog]

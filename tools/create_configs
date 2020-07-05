@@ -1,11 +1,24 @@
+#!/usr/bin/python
+
+import os
+from os import path
+
+prime_path  = os.environ.get('PRIME_PATH') 
+cfg_dir = path.join(prime_path, "xml")
+
+for pr in ["mesi", "wu"]:
+    for c in [1, 2, 4, 8, 16]:
+          with open(path.join(cfg_dir, "%s_c%d.xml") % (pr, c), 'w') as f:
+              f.write("""\
 <?xml version = "1.0" encoding = "utf-8" standalone = "yes"?>
 
 <simulator>
-    <num_recv_threads>4</num_recv_threads>
-    <max_msg_size>100</max_msg_size>
+    <num_prod_threads>2</num_prod_threads>
+    <num_cons_threads>8</num_cons_threads>
+    <max_msg_size>128</max_msg_size>
     <system>
        <dram_access_time>120</dram_access_time>
-       <protocol>0</protocol>
+       <protocol>%d</protocol>
        <network>
           <inject_delay>1</inject_delay>
           <net_type>0</net_type>
@@ -15,10 +28,11 @@
           <router_delay>0</router_delay>
        </network>
        <bus>
-          <bandwidth>8</bandwidth>
-          <data_pkt_len>88</data_pkt_len>
+          <ratio>1</ratio>
+          <bandwidth>32</bandwidth>
+          <data_pkt_len>64</data_pkt_len>
           <unlim_bw>1</unlim_bw>
-          <ctrl_pkt_len>24</ctrl_pkt_len>
+          <ctrl_pkt_len>8</ctrl_pkt_len>
        </bus>
        <verbose_report>1</verbose_report>
        <cache>
@@ -32,12 +46,12 @@
        <cache>
           <num_ways>16</num_ways>
           <access_time>10</access_time>
-          <level>2</level>
+          <level>1</level>
           <share>1</share>
-          <block_size>4096</block_size>
-          <size>1048676</size>
+          <block_size>64</block_size>
+          <size>1048576</size>
        </cache>
-       <num_cores>64</num_cores>
+       <num_cores>%d</num_cores>
        <page_size>4096</page_size>
        <page_miss_delay>200</page_miss_delay>
        <directory_cache>
@@ -65,7 +79,7 @@
        <sys_type>1</sys_type>
        <max_num_sharers>6</max_num_sharers>
     </system>
-    <syscall_cost>100</syscall_cost>
-    <thread_sync_interval>10000</thread_sync_interval>
-    <proc_sync_interval>10000</proc_sync_interval>
+    <syscall_cost>0</syscall_cost>
+    <thread_sync_interval>128</thread_sync_interval>
 </simulator>
+""" % ((1 if pr == "wu" else 0), c))

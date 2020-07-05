@@ -38,10 +38,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 struct Retranslator {
     MPI_Comm comm;
     std::array<std::thread, MAX_THREADS_PER_PROCESS> threads;
-    const int pid = 1;
-    const int max_msg_size = 1024;
+    const std::string task_id;
+    const int pid = -1;
+    const int max_msg_size = -1;
 
-    Retranslator(int pid, int max_msg_size);
+    Retranslator(const std::string& task_id, int pid, int max_msg_size);
     Retranslator() = delete;
     ~Retranslator();
     void main_server();

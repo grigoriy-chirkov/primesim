@@ -1,0 +1,24 @@
+#!/usr/bin/python
+
+import os
+from os import path
+import subprocess
+import time
+
+prime_path  = os.environ.get('PRIME_PATH') 
+cfg_dir = path.join(prime_path, "xml")
+out_dir = path.join(prime_path, "output")
+
+benchmarks=["bt.W.x", "cg.W.x", "ep.W.x", "is.W.x", "sp.W.x", "mg.W.x", "lu.W.x", "ua.W.x", "ft.W.x", "dc.W.x"]
+
+for bench in benchmarks:
+	for pr in ["mesi", "wu"]:
+	    for c in [1, 2, 4, 8, 16]:
+	    	eff_cores = c  
+	        subprocess.call(["run_prime", 
+	            "-c", path.join(cfg_dir, "%s_c%d.xml" % (pr, eff_cores)), 
+	            "-o", path.join(out_dir, "%s_%s_c%d.out" % (bench, pr, c)),
+	            "-p", "-c8 -t23:00:00", 
+	            "-b", 
+	            bench])
+	        time.sleep(1)

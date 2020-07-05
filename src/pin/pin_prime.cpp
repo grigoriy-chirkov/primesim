@@ -51,6 +51,9 @@ KNOB<int> KnobMaxMsgSize(KNOB_MODE_WRITEONCE, "pintool",
 KNOB<int> KnobPID(KNOB_MODE_WRITEONCE, "pintool",
     "p", "1", "specify pid of current process");
 
+KNOB<string> KnobTaskId(KNOB_MODE_WRITEONCE, "pintool",
+    "i", "prime", "specify task id");
+
 // Handle non-memory instructions
 inline void execNonMem(uint32_t ins_count, THREADID threadid)
 {
@@ -166,7 +169,7 @@ void Trace(TRACE trace, void *v)
 
 inline void Start(void *v)
 {
-    core_manager = new CoreManager(KnobPID.Value(), KnobMaxMsgSize.Value());
+    core_manager = new CoreManager(KnobTaskId.Value(), KnobPID.Value(), KnobMaxMsgSize.Value());
     core_manager->startSim();
 
 }
