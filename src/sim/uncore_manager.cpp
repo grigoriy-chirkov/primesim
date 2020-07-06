@@ -127,7 +127,7 @@ void UncoreManager::msgProducer(int my_tid)
         bool throttle = true;
         for (int cid = my_tid; cid < num_cores; cid += num_prod_threads) {
             auto& cdata = core_data[cid];
-            if (!cdata.valid)
+            if (!cdata.valid || cdata.finished)
                 continue;
 
             // Check that we have msg incoming
@@ -145,15 +145,15 @@ void UncoreManager::msgProducer(int my_tid)
                 continue;
             // Finally receive message
             MPI_Recv(inbuffer.get(), msg_size, MPI_CHAR, MPI_ANY_SOURCE, cid, comm, MPI_STATUS_IGNORE);
-            throttle = false;
-
-            if (msg.type == InstMsg::TERMINATE)
-                return;
-
             cdata.insert_msg(inbuffer.get(), msg_count);
+            throttle = false;
         }
         if (throttle) {
-            this_thread::yield();
+            if (num_threads == 0 && cur_segment > 0) {
+                return;
+            } else {
+                this_thread::yield();
+            }
         }
     }
 }
@@ -242,7 +242,7 @@ void UncoreManager::msgConsumer(int my_tid)
 
         if (cnt_value >= max(num_threads_live.load(), 1)) {
             cur_segment++;
-            if (cur_segment % 1000 == 0) {
+            if (cur_segment % 10000 == 0) {
                 lock_guard<mutex> lck(print_mutex);
                 cout << "[PriME] Segment " << cur_segment << " finished" << endl;
             }
@@ -335,9 +335,6 @@ void UncoreManager::spawn_threads()
 
 void UncoreManager::collect_threads() 
 {
-    InstMsg term_msg;
-    term_msg.type = InstMsg::TERMINATE;
-    
     int idx = 0;
     for(auto& t : consumers) { 
         t.join();
@@ -347,7 +344,6 @@ void UncoreManager::collect_threads()
 
     idx = 0;
     for(auto& t : producers) { 
-        MPI_Send(&term_msg, sizeof(InstMsg), MPI_CHAR, 0, idx, comm);
         t.join();
         cout << "[PriME] Main: completed join with producer thread " << idx << endl;
         idx++;
