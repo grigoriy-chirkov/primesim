@@ -133,7 +133,7 @@ def main():
                       metavar="OUTPUT_PATH", help="write the report to OUTPUT_PATH (default: output/config.out)") 
 
     parser.add_option("-t", "--threads",
-                       dest="threads", default=1, 
+                       dest="threads", default='1', 
                        metavar="THREADS", help="number of threads per task")   
 
     parser.add_option("-d", "--dry",

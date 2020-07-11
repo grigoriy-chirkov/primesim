@@ -79,8 +79,6 @@ void CoreManager::threadStart(THREADID tid, CONTEXT *ctxt, int32_t flags, void *
 // This routine is executed every time a thread is destroyed.
 void CoreManager::threadFini(THREADID tid, const CONTEXT *ctxt, int32_t code, void *v)
 {
-    CtrlMsg msg{CtrlMsg::THREAD_FINISH, pid, tid};
-    write(fifo_fd, &msg, sizeof(CtrlMsg));
     thread_data[tid].finish();
 }
 
@@ -116,55 +114,6 @@ bool isLock(ADDRINT num, ADDRINT arg1)
     return false;
 }
 
-// Called before syscalls
-void CoreManager::sysBefore(ADDRINT num, ADDRINT arg1, THREADID tid)
-{
-    if (isLock(num, arg1)) {
-        CtrlMsg msg{CtrlMsg::THREAD_LOCK, pid, tid};
-        write(fifo_fd, &msg, sizeof(CtrlMsg));
-        thread_data[tid].sysBefore(num, arg1);
-    }
-}
-
-// Called after syscalls
-void CoreManager::sysAfter(THREADID tid)
-{
-    if (thread_data[tid].state == ThreadData::LOCKED){
-        CtrlMsg msg{CtrlMsg::THREAD_UNLOCK, pid, tid};
-        write(fifo_fd, &msg, sizeof(CtrlMsg));
-        thread_data[tid].sysAfter();  
-    }
-}
-
-// Enter a syscall
-void CoreManager::syscallEntry(THREADID threadIndex, CONTEXT *ctxt, SYSCALL_STANDARD std, void *v)
-{
-    sysBefore(PIN_GetSyscallNumber(ctxt, std),
-              PIN_GetSyscallArgument(ctxt, std, 1),
-              threadIndex);
-}
-
-// Exit a syscall
-void CoreManager::syscallExit(THREADID threadIndex, CONTEXT *ctxt, SYSCALL_STANDARD std, void *v)
-{
-    sysAfter(threadIndex);
-}
-
-// void CoreManager::syscallEntry(THREADID tid)
-// {
-//     auto& tdata = thread_data[tid];    
-//     if(tdata.thread_state == ACTIVE) {
-//         if(tdata.mpi_pos > 1) {
-//             drainMemReqs(tid);
-//         }
-
-//         MPIMsg msg;
-//         msg.populate_control(THREAD_LOCK, tid, pid);
-//         write(tdata.fifo_fd, &msg, sizeof(MPIMsg));
-//     }
-// }
-
-
 void ThreadData::start(const string& _task_id, int _pid, int _tid, int _max_msg_size)
 {
     valid = true;
@@ -187,23 +136,24 @@ void ThreadData::finish()
     close(fifo_fd);
 }
 
-void ThreadData::addMsg(InstMsg::Type type, uint64_t addr) 
+void ThreadData::addMsg(InstMsg::Type type, uint64_t addr, bool is_unlock) 
 {
     assert(pos < max_msg_size);
     if (isMem(type)) {
-        msgs[pos] = {type, addr, ins_nonmem};        
+        msgs[pos] = {type, addr, ins_nonmem, false};        
         ins_nonmem = 0;
     } else {
-        msgs[pos] = {type, 0, 0};
+        msgs[pos] = {type, 0, 0, is_unlock};
     }
     pos++;
-    if (isMem(type) && (pos >= (max_msg_size - 4))) {
+    if (pos >= max_msg_size) {
         drainMsgs();
     }
 }
 
 void ThreadData::drainMsgs() 
 {
+    if (pos == 0) return;
     write(fifo_fd, msgs.data(), pos * sizeof(InstMsg));
     pos = 0;
 }
@@ -215,26 +165,4 @@ void ThreadData::createPipe()
     fifo_fd = open(fifo_name.c_str(), O_WRONLY);
     assert(fifo_fd != -1);
     fcntl(fifo_fd, F_SETPIPE_SZ, sizeof(InstMsg) * max_msg_size);
-}
-
-void ThreadData::addNonMem(uint32_t ins_count_in) 
-{
-    ins_nonmem += ins_count_in;
-}
-
-// Called before syscalls
-void ThreadData::sysBefore(ADDRINT num, ADDRINT arg1)
-{
-    if (isLock(num, arg1) && (state = ACTIVE)) { 
-        state = LOCKED;
-        addMsg(InstMsg::THREAD_LOCK);
-    }
-}
-
-void ThreadData::sysAfter()
-{
-    if (state == LOCKED) {
-        state = ACTIVE;
-        addMsg(InstMsg::THREAD_UNLOCK);
-    }
 }

@@ -39,21 +39,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 constexpr int MAX_THREADS_PER_PROCESS = 2048;
 
-
-// enum MessageType
-// {
-//     WRONG=0,
-//     PROCESS_START = 1,
-//     PROCESS_FINISH = 2,
-//     THREAD_START = 3,
-//     THREAD_FINISH = 4,
-//     THREAD_LOCK = 5,
-//     THREAD_UNLOCK = 6, 
-//     MEM_RD = 7,
-//     MEM_WR = 8,
-//     TERMINATE = 9
-// };
-
 struct CtrlMsg
 {
     enum Type {
@@ -61,9 +46,7 @@ struct CtrlMsg
         PROCESS_START = 1,
         PROCESS_FINISH = 2,
         THREAD_START = 3,
-        THREAD_FINISH = 4,
-        THREAD_LOCK = 5,
-        THREAD_UNLOCK = 6 
+        THREAD_FINISH = 4
     };
     Type type = WRONG;
     int pid = 0;
@@ -78,8 +61,8 @@ struct InstMsg
         WRONG = 0,
         THREAD_START = 1,
         THREAD_FINISH = 2,
-        THREAD_LOCK = 3,
-        THREAD_UNLOCK = 4, 
+        SYSCALL_IN = 3,
+        SYSCALL_OUT = 4, 
         MEM_RD = 5,
         MEM_WR = 6,
         TERMINATE = 7
@@ -87,6 +70,7 @@ struct InstMsg
     Type        type = WRONG;
     uint64_t    addr = 0; 
     uint32_t    ins_before = 0;
+    bool        is_unlock = false;
 
     inline bool isWr() { return type == MEM_WR; };
 };

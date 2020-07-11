@@ -89,7 +89,6 @@ void UncoreManager::alloc_server()
                 break;
             }
             case CtrlMsg::THREAD_START: {//Receive a msg indicating a new thread
-                num_threads_live++;
                 int cid = next_empty_core;
                 next_empty_core++;   
                 if (cid >= num_cores) {
@@ -100,15 +99,6 @@ void UncoreManager::alloc_server()
                 MPI_Send(&cid, 1, MPI_INT, msg.pid, msg.tid, comm);
                 break;
             }
-            case CtrlMsg::THREAD_FINISH:
-                num_threads_live--;
-                break;
-            case CtrlMsg::THREAD_LOCK:
-                num_threads_live--;
-                break;
-            case CtrlMsg::THREAD_UNLOCK:
-                num_threads_live++;
-                break;
             default: {
                 cerr << "Wrong msg type in allocServer from process " << msg.pid << " thread " << msg.tid << endl;
                 MPI_Abort(MPI_COMM_WORLD, -1);
@@ -181,30 +171,36 @@ void UncoreManager::msgConsumer(int my_tid)
                 switch (msg.type) {
                     case InstMsg::THREAD_START: {
                         num_threads++;
+                        num_threads_live++;
                         lock_guard<mutex> lck(print_mutex);
                         cout << "[PriME] Pin thread " << cdata.tid << " from process " << cdata.pid << " begins in core " << cid << endl;
                         break;
                     }
                     case InstMsg::THREAD_FINISH: {
                         num_threads--;
+                        num_threads_live--;                        
                         cdata.finished = true;
                         lock_guard<mutex> lck(print_mutex);
                         cout << "[PriME] Thread " << cdata.tid << " from process " << cdata.pid << " finishes" << endl;
                         break;
                     }
-                    case InstMsg::THREAD_LOCK:{
+                    case InstMsg::SYSCALL_IN:{
+                        num_threads_live--;
                         cdata.locked = true;
                         break;
                     }
-                    case InstMsg::THREAD_UNLOCK: {
-                        cdata.cycle = getCycle();
+                    case InstMsg::SYSCALL_OUT: {
+                        if (msg.is_unlock) {
+                            cdata.cycle = getCycle();                        
+                        }
+                        num_threads_live++;
                         cdata.locked = false;
                         break;
                     }
                     case InstMsg::MEM_RD:
                     case InstMsg::MEM_WR: {
                         auto nonmem_inst = msg.ins_before; 
-                        auto nonmem_cycles = msg.ins_before * cpi_nonmem;
+                        auto nonmem_cycles = ceil(msg.ins_before * cpi_nonmem);
                         cdata.nonmem_cycles += nonmem_cycles;
                         cdata.cycle += nonmem_cycles;
                         cdata.ins_nonmem += nonmem_inst;
@@ -278,8 +274,7 @@ void UncoreManager::report(const char* result_basename)
     uint64_t total_nonmem_ins_count = 0;
     uint64_t total_mem_ins_count = 0;
     uint64_t total_cycles = 0;
-    for (int i = 0; i < num_cores; i++) {
-        auto& cdata = core_data[i];
+    for (const auto& cdata : core_data) {
         if (!cdata.valid) continue;
         total_mem_ins_count += cdata.ins_mem;
         total_nonmem_ins_count += cdata.ins_nonmem;
@@ -288,6 +283,7 @@ void UncoreManager::report(const char* result_basename)
             total_cycles = local_cycles;
     }
     total_ins_count = total_mem_ins_count + total_nonmem_ins_count;
+    // total_cycles = getCycle();
 
     result_ofstream << "*********************************************************\n";
     result_ofstream << "*                   PriME Simulator                     *\n";
@@ -399,10 +395,7 @@ CoreData::~CoreData()
 void CoreData::insert_msg(const InstMsg* inbuffer, size_t num) 
 {
     unique_lock<mutex> lck(local_mutex);
-    while(count + num > max_count) { // full
-    // wait until some elements are consumed
-        can_produce.wait(lck);
-    }
+    can_produce.wait(lck, [this, num]{ return count + num <= max_count; });
 
     if (num > max_count - in_pos){
         uint64_t part1 = max_count - in_pos;

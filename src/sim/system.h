@@ -77,10 +77,6 @@ struct alignas(64) CacheLevel
     const uint64_t    size = 0;
     const uint64_t    num_ways = 0;
     const uint64_t    block_size = 0;
-    uint64_t    ins_count = 0;
-    uint64_t    miss_count = 0;
-    double      miss_rate = 0.0;
-    double      lock_time = 0.0;
 
     CacheLevel(int _level, int _share, int _num_caches, 
                int _access_time, uint64_t _size, 

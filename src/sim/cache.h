@@ -95,7 +95,6 @@ struct InsMem
 {
     char        mem_type = -1; // -1 means invalid, 2 means writeback, 1 means write, 0 means read
     int         pid = -1;
-    //int         tid = -1;
     uint64_t    addr_dmem = 0; 
 };
 
@@ -168,7 +167,6 @@ class Cache
         int               cache_id;
         uint64_t          offset_mask;
         uint64_t          index_mask;
-
 };
 
 #endif //CACHE_H

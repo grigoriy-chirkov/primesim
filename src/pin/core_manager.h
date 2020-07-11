@@ -45,6 +45,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "common.h"
 
 
+bool isLock(ADDRINT num, ADDRINT arg1);
+
 struct alignas(64) ThreadData {
     enum State
     {
@@ -67,10 +69,28 @@ struct alignas(64) ThreadData {
 
     void start(const std::string& task_id, int pid, int tid, int max_msg_size);
     void finish();
-    void addMsg(InstMsg::Type type, uint64_t addr = 0);
-    void addNonMem(uint32_t ins_count_in);
-    void sysBefore(ADDRINT num, ADDRINT arg1);
-    void sysAfter();
+    void addMsg(InstMsg::Type type, uint64_t addr = 0, bool is_unlock = false);
+    
+    inline void addNonMem(uint32_t ins_count_in) {
+        ins_nonmem += ins_count_in;
+    };
+
+    inline void syscallBefore() {
+        addMsg(InstMsg::SYSCALL_IN);
+        drainMsgs();
+    };
+
+    inline void syscallEntry(ADDRINT num, ADDRINT arg1) {
+        if (isLock(num, arg1) && (state = ACTIVE)) { 
+            state = LOCKED;
+        }
+    };
+
+    inline void syscallExit() {
+        addMsg(InstMsg::SYSCALL_OUT, 0, state == LOCKED);
+        state = ACTIVE;
+    }
+
     static inline bool isMem(InstMsg::Type type) {
         return ((type == InstMsg::MEM_RD) || (type == InstMsg::MEM_WR));
     };
@@ -86,24 +106,32 @@ class CoreManager
         CoreManager(const std::string& task_id, int pid, int max_msg_size);
         void startSim();
         void finishSim(int32_t code, void *v);
-        void threadStart(THREADID threadid, CONTEXT *ctxt, int32_t flags, void *v);
-        void threadFini(THREADID threadid, const CONTEXT *ctxt, int32_t code, void *v);
-        // void syscallEntry(THREADID threadid);
-        void syscallEntry(THREADID threadIndex, CONTEXT *ctxt, SYSCALL_STANDARD std, void *v);
-        void syscallExit(THREADID threadIndex, CONTEXT *ctxt, SYSCALL_STANDARD std, void *v);
+        void threadStart(THREADID tid, CONTEXT *ctxt, int32_t flags, void *v);
+        void threadFini(THREADID tid, const CONTEXT *ctxt, int32_t code, void *v);
         
-        inline void execNonMem(uint32_t ins_count_in, THREADID threadid) {
-            thread_data[threadid].addNonMem(ins_count_in);
+        inline void syscallBefore(THREADID tid) {
+            thread_data[tid].syscallBefore();
         };
-        inline void execMem(void * addr, THREADID threadid, uint32_t size, bool mem_type){
-            thread_data[threadid].addMsg(mem_type ? InstMsg::MEM_WR : InstMsg::MEM_RD, uint64_t(addr));
+        
+        inline void syscallEntry(THREADID tid, CONTEXT *ctxt, SYSCALL_STANDARD std, void *v) {
+            thread_data[tid].syscallEntry(PIN_GetSyscallNumber(ctxt, std),
+                                          PIN_GetSyscallArgument(ctxt, std, 1));
+        }
+        
+        inline void syscallExit(THREADID tid, CONTEXT *ctxt, SYSCALL_STANDARD std, void *v) {
+            thread_data[tid].syscallExit();
+        }
+        
+        inline void execNonMem(uint32_t ins_count_in, THREADID tid) {
+            thread_data[tid].addNonMem(ins_count_in);
+        };
+        inline void execMem(void * addr, THREADID tid, uint32_t size, bool mem_type){
+            thread_data[tid].addMsg(mem_type ? InstMsg::MEM_WR : InstMsg::MEM_RD, uint64_t(addr));
         };
 
     private:
         CoreManager() = delete;
         void createPipe();
-        void sysBefore(ADDRINT num, ADDRINT arg1, THREADID threadid);
-        void sysAfter(THREADID threadid);
 
         std::array<ThreadData, MAX_THREADS_PER_PROCESS> thread_data;
         const std::string task_id;

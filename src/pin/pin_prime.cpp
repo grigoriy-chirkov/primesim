@@ -72,27 +72,32 @@ inline void execMem(void * addr, THREADID threadid, uint32_t size, bool mem_type
 // } 
 
 // This routine is executed every time a thread starts.
-inline void ThreadStart(THREADID threadid, CONTEXT *ctxt, int32_t flags, void *v)
+inline void ThreadStart(THREADID tid, CONTEXT *ctxt, int32_t flags, void *v)
 {
-    core_manager->threadStart(threadid, ctxt, flags, v);
+    core_manager->threadStart(tid, ctxt, flags, v);
 }
 
 // This routine is executed every time a thread is destroyed.
-inline void ThreadFini(THREADID threadid, const CONTEXT *ctxt, int32_t code, void *v)
+inline void ThreadFini(THREADID tid, const CONTEXT *ctxt, int32_t code, void *v)
 {
-    core_manager->threadFini(threadid, ctxt, code, v);
+    core_manager->threadFini(tid, ctxt, code, v);
 }
 
 // Enter a syscall
-inline void SyscallEntry(THREADID threadIndex, CONTEXT *ctxt, SYSCALL_STANDARD std, void *v)
+inline void SyscallEntry(THREADID tid, CONTEXT *ctxt, SYSCALL_STANDARD std, void *v)
 {
-    core_manager->syscallEntry(threadIndex, ctxt, std, v);
+    core_manager->syscallEntry(tid, ctxt, std, v);
 }
 
 // Exit a syscall
-inline void SyscallExit(THREADID threadIndex, CONTEXT *ctxt, SYSCALL_STANDARD std, void *v)
+inline void SyscallExit(THREADID tid, CONTEXT *ctxt, SYSCALL_STANDARD std, void *v)
 {
-    core_manager->syscallExit(threadIndex, ctxt, std, v);
+    core_manager->syscallExit(tid, ctxt, std, v);
+}
+
+inline void SyscallBefore(THREADID tid)
+{
+    core_manager->syscallBefore(tid);
 }
 
 
@@ -101,7 +106,6 @@ void Trace(TRACE trace, void *v)
 {
     // Visit every basic block  in the trace
     for (BBL bbl = TRACE_BblHead(trace); BBL_Valid(bbl); bbl = BBL_Next(bbl)) {
-        uint32_t nonmem_count = 0;
         for (INS ins = BBL_InsHead(bbl); INS_Valid(ins); ins = INS_Next(ins)) {
 
             // Instruments memory accesses using a predicated call, i.e.
@@ -141,28 +145,20 @@ void Trace(TRACE trace, void *v)
                 }
             }
             else {
-                nonmem_count++;
-                // INS_InsertPredicatedCall(
-                //     ins, IPOINT_BEFORE, (AFUNPTR)execNonMem, 
-                //     IARG_UINT32, 1, 
-                //     IARG_THREAD_ID, 
-                //     IARG_END
-                // );
+                INS_InsertPredicatedCall(
+                    ins, IPOINT_BEFORE, (AFUNPTR)execNonMem, 
+                    IARG_UINT32, 1, 
+                    IARG_THREAD_ID, 
+                    IARG_END
+                );
             }
-
-            // if (INS_IsSyscall(ins)) {
-            //     INS_InsertPredicatedCall(
-            //         ins, IPOINT_BEFORE, (AFUNPTR)syscallEntry,
-            //         IARG_THREAD_ID, IARG_END);
-            // }
+            if (INS_IsSyscall(ins)) {
+                INS_InsertPredicatedCall(
+                    ins, IPOINT_BEFORE, (AFUNPTR)SyscallBefore,
+                    IARG_THREAD_ID, IARG_END);
+            }
         }
-        // Insert a call to execNonMem before every bbl, passing the number of nonmem instructions
-        BBL_InsertCall(bbl, IPOINT_BEFORE, (AFUNPTR)execNonMem, IARG_FAST_ANALYSIS_CALL, 
-                      IARG_UINT32, nonmem_count, 
-                      IARG_THREAD_ID, 
-                      IARG_END);
-
-    } // End Ins For
+    } 
 }
 
 
